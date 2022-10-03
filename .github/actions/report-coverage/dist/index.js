@@ -9546,10 +9546,10 @@ const report = async function (json) {
   ];
 
   const message = `## SimpleCov Coverage
-    | | Line coverage | Branch coverage |
-    |---:|:---:|:---:|
-    | Total | ${json.result.line} % | ${json.result.branch} % |
-    `;
+| | Line coverage | Branch coverage |
+|---:|:---:|:---:|
+| Total | ${json.result.line} % | ${json.result.branch} % |
+`;
 
   return message;
 }
