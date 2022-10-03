@@ -22,7 +22,8 @@ jobs:
     - run: bundle exec rspec
     - name: Publish coverage results
       uses: ./.github/actions/report-coverage
-
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   lint:
     runs-on: ubuntu-latest
     steps:
