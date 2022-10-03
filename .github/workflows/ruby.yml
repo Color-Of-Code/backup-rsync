@@ -20,6 +20,7 @@ jobs:
         ruby-version: 3.1
         bundler-cache: true
     - run: bundle exec rspec
+    - uses: ./.github/actions/report-coverage
 
   lint:
     runs-on: ubuntu-latest
