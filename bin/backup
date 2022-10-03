@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+
+require 'zeitwerk'
+
+loader = Zeitwerk::Loader.for_gem
+loader.setup
+
+require_relative '../lib/backup/cli'
+
+loader.eager_load
+
+Backup::CLI.start(ARGV)
