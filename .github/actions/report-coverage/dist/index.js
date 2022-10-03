@@ -9512,9 +9512,8 @@ const github = __nccwpck_require__(5438);
 const comment = async function (message) {
   const pullRequestId = github.context.issue.number;
   if (pullRequestId) {
-    const client = new github.getOctokit(process.env.GITHUB_TOKEN);
-    const response = await client.issues.createComment({
-      token,
+    const octokit = new github.getOctokit(process.env.GITHUB_TOKEN);
+    const response = await octokit.rest.issues.createComment({
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,
       issue_number: pullRequestId,
