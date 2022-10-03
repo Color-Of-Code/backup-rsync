@@ -1,0 +1,8 @@
+name: 'Report Coverage'
+description: 'Make a mini coverage report in form of a comment into the PR'
+runs:
+  using: 'node16'
+  main: 'dist/index.js'
+branding:
+  icon: 'check-circle'
+  color: 'gray-dark'
