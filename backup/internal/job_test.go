@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"log"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -12,6 +13,27 @@ func boolPtr(b bool) *bool {
 	return &b
 }
 
+var capturedArgs []string
+
+var mockExecCommand = func(name string, args ...string) *exec.Cmd {
+	capturedArgs = args // Capture arguments for assertions
+	if name == "rsync" {
+		if strings.Contains(strings.Join(args, " "), "/invalid/source/path") {
+			cmd := exec.Command("false") // Simulate failure for invalid paths
+			cmd.Args = append([]string{name}, args...)
+			return cmd
+		}
+		cmd := exec.Command("echo")
+		cmd.Args = append([]string{name}, args...)
+		return cmd
+	}
+	return exec.Command(name, args...)
+}
+
+func init() {
+	execCommand = mockExecCommand
+}
+
 func TestBuildRsyncCmd(t *testing.T) {
 	job := Job{
 		Source:     "/home/user/Music/",
@@ -19,8 +41,8 @@ func TestBuildRsyncCmd(t *testing.T) {
 		Delete:     nil,
 		Exclusions: []string{"*.tmp", "node_modules/"},
 	}
-	dryRun := true
-	cmd := buildRsyncCmd(job, dryRun)
+	simulate := true
+	cmd := buildRsyncCmd(job, simulate)
 
 	expectedArgs := []string{
 		"rsync", "--dry-run", "-aiv", "--info=progress2", "--delete",
@@ -41,10 +63,10 @@ func TestExecuteJob(t *testing.T) {
 		Delete:     nil,
 		Exclusions: []string{"*.tmp"},
 	}
-	dryRun := true
+	simulate := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	status := ExecuteJob(job, dryRun, logger)
+	status := ExecuteJob(job, simulate, logger)
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
@@ -56,7 +78,7 @@ func TestExecuteJob(t *testing.T) {
 		Enabled: boolPtr(false),
 	}
 
-	status = ExecuteJob(disabledJob, dryRun, logger)
+	status = ExecuteJob(disabledJob, simulate, logger)
 	if status != "SKIPPED" {
 		t.Errorf("Expected status SKIPPED, got %s", status)
 	}
@@ -81,10 +103,10 @@ func TestJobSkippedEnabledTrue(t *testing.T) {
 		Target:  "/mnt/backup1/test/",
 		Enabled: boolPtr(true),
 	}
-	dryRun := true
+	simulate := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	status := ExecuteJob(job, dryRun, logger)
+	status := ExecuteJob(job, simulate, logger)
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
@@ -97,10 +119,10 @@ func TestJobSkippedEnabledFalse(t *testing.T) {
 		Target:  "/mnt/backup1/disabled/",
 		Enabled: boolPtr(false),
 	}
-	dryRun := true
+	simulate := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	status := ExecuteJob(disabledJob, dryRun, logger)
+	status := ExecuteJob(disabledJob, simulate, logger)
 	if status != "SKIPPED" {
 		t.Errorf("Expected status SKIPPED, got %s", status)
 	}
@@ -112,11 +134,32 @@ func TestJobSkippedEnabledOmitted(t *testing.T) {
 		Source: "/home/omitted/",
 		Target: "/mnt/backup1/omitted/",
 	}
-	dryRun := true
+	simulate := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	status := ExecuteJob(job, dryRun, logger)
+	status := ExecuteJob(job, simulate, logger)
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
+	}
+}
+
+func TestExecuteJobWithMockedRsync(t *testing.T) {
+	// Reset capturedArgs before the test
+	capturedArgs = nil
+
+	job := Job{
+		Name:       "test_job",
+		Source:     "/home/test/",
+		Target:     "/mnt/backup1/test/",
+		Delete:     nil,
+		Exclusions: []string{"*.tmp"},
+	}
+	simulate := true
+	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
+
+	_ = ExecuteJob(job, simulate, logger)
+
+	if len(capturedArgs) == 0 || capturedArgs[0] != "--dry-run" {
+		t.Errorf("Expected --dry-run flag, got %v", capturedArgs)
 	}
 }

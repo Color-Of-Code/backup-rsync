@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+var execCommand = exec.Command
+
 func buildRsyncCmd(job Job, simulate bool) *exec.Cmd {
 	args := []string{"-aiv", "--info=progress2"}
 	if job.Delete == nil || *job.Delete {
@@ -19,7 +21,7 @@ func buildRsyncCmd(job Job, simulate bool) *exec.Cmd {
 	if simulate {
 		args = append([]string{"--dry-run"}, args...)
 	}
-	return exec.Command("rsync", args...)
+	return execCommand("rsync", args...)
 }
 
 func ExecuteJob(job Job, simulate bool, logger *log.Logger) string {
@@ -31,13 +33,11 @@ func ExecuteJob(job Job, simulate bool, logger *log.Logger) string {
 	cmd := buildRsyncCmd(job, simulate)
 	fmt.Printf("Job: %s\n", job.Name)
 	fmt.Printf("Command: %s\n", strings.Join(cmd.Args, " "))
-	if !simulate {
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			logger.Printf("ERROR [%s]: %v\nOutput: %s", job.Name, err, string(out))
-			return "FAILURE"
-		}
-		logger.Printf("SUCCESS [%s]: %s", job.Name, string(out))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		logger.Printf("ERROR [%s]: %v\nOutput: %s", job.Name, err, string(out))
+		return "FAILURE"
 	}
+	logger.Printf("SUCCESS [%s]: %s", job.Name, string(out))
 	return "SUCCESS"
 }
