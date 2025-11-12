@@ -36,9 +36,15 @@ func executeSyncJobs(cfg internal.Config, simulate bool) {
 		defer logFile.Close()
 		jobLogger := log.New(logFile, "", log.LstdFlags)
 
-		status := internal.ExecuteJob(job, simulate, jobLogger)
+		status := internal.ExecuteJob(job, simulate, false, jobLogger)
 		overallLogger.Printf("STATUS [%s]: %s", job.Name, status)
 		fmt.Printf("Status [%s]: %s\n", job.Name, status)
+	}
+}
+
+func listCommands(cfg internal.Config, simulate bool) {
+	for _, job := range cfg.Jobs {
+		internal.ExecuteJob(job, simulate, true, nil)
 	}
 }
 
@@ -60,7 +66,17 @@ var simulateCmd = &cobra.Command{
 	},
 }
 
+var listCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List the commands that will be executed",
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg := loadResolvedConfig(configPath)
+		listCommands(cfg, true)
+	},
+}
+
 func init() {
 	RootCmd.AddCommand(runCmd)
 	RootCmd.AddCommand(simulateCmd)
+	RootCmd.AddCommand(listCmd)
 }

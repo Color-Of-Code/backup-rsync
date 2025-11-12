@@ -16,16 +16,15 @@ func boolPtr(b bool) *bool {
 var capturedArgs []string
 
 var mockExecCommand = func(name string, args ...string) *exec.Cmd {
-	capturedArgs = args // Capture arguments for assertions
 	if name == "rsync" {
-		if strings.Contains(strings.Join(args, " "), "/invalid/source/path") {
-			cmd := exec.Command("false") // Simulate failure for invalid paths
-			cmd.Args = append([]string{name}, args...)
-			return cmd
+		capturedArgs = append(capturedArgs, args...) // Append arguments for assertions
+		if strings.Contains(strings.Join(args, " "), "--dry-run") {
+			return exec.Command("echo", "mocked rsync success") // Simulate success for dry-run
 		}
-		cmd := exec.Command("echo")
-		cmd.Args = append([]string{name}, args...)
-		return cmd
+		if strings.Contains(strings.Join(args, " "), "/invalid/source/path") {
+			return exec.Command("false") // Simulate failure for invalid paths
+		}
+		return exec.Command("echo", "mocked rsync success") // Simulate general success
 	}
 	return exec.Command(name, args...)
 }
@@ -42,16 +41,16 @@ func TestBuildRsyncCmd(t *testing.T) {
 		Exclusions: []string{"*.tmp", "node_modules/"},
 	}
 	simulate := true
-	cmd := buildRsyncCmd(job, simulate)
+	args := buildRsyncCmd(job, simulate)
 
 	expectedArgs := []string{
-		"rsync", "--dry-run", "-aiv", "--info=progress2", "--delete",
+		"--dry-run", "-aiv", "--info=progress2", "--delete",
 		"--exclude=*.tmp", "--exclude=node_modules/",
 		"/home/user/Music/", "/target/user/music/home",
 	}
 
-	if strings.Join(cmd.Args, " ") != strings.Join(expectedArgs, " ") {
-		t.Errorf("Expected %v, got %v", expectedArgs, cmd.Args)
+	if strings.Join(args, " ") != strings.Join(expectedArgs, " ") {
+		t.Errorf("Expected %v, got %v", expectedArgs, args)
 	}
 }
 
@@ -66,7 +65,7 @@ func TestExecuteJob(t *testing.T) {
 	simulate := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	status := ExecuteJob(job, simulate, logger)
+	status := ExecuteJob(job, simulate, false, logger)
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
@@ -78,7 +77,7 @@ func TestExecuteJob(t *testing.T) {
 		Enabled: boolPtr(false),
 	}
 
-	status = ExecuteJob(disabledJob, simulate, logger)
+	status = ExecuteJob(disabledJob, simulate, false, logger)
 	if status != "SKIPPED" {
 		t.Errorf("Expected status SKIPPED, got %s", status)
 	}
@@ -90,7 +89,7 @@ func TestExecuteJob(t *testing.T) {
 		Target: "/mnt/backup1/invalid/",
 	}
 
-	status = ExecuteJob(invalidJob, false, logger)
+	status = ExecuteJob(invalidJob, false, false, logger)
 	if status != "FAILURE" {
 		t.Errorf("Expected status FAILURE, got %s", status)
 	}
@@ -106,7 +105,7 @@ func TestJobSkippedEnabledTrue(t *testing.T) {
 	simulate := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	status := ExecuteJob(job, simulate, logger)
+	status := ExecuteJob(job, simulate, false, logger)
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
@@ -122,7 +121,7 @@ func TestJobSkippedEnabledFalse(t *testing.T) {
 	simulate := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	status := ExecuteJob(disabledJob, simulate, logger)
+	status := ExecuteJob(disabledJob, simulate, false, logger)
 	if status != "SKIPPED" {
 		t.Errorf("Expected status SKIPPED, got %s", status)
 	}
@@ -137,7 +136,7 @@ func TestJobSkippedEnabledOmitted(t *testing.T) {
 	simulate := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	status := ExecuteJob(job, simulate, logger)
+	status := ExecuteJob(job, simulate, false, logger)
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
@@ -157,7 +156,11 @@ func TestExecuteJobWithMockedRsync(t *testing.T) {
 	simulate := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	_ = ExecuteJob(job, simulate, logger)
+	status := ExecuteJob(job, simulate, false, logger)
+
+	if status != "SUCCESS" {
+		t.Errorf("Expected status SUCCESS, got %s", status)
+	}
 
 	if len(capturedArgs) == 0 || capturedArgs[0] != "--dry-run" {
 		t.Errorf("Expected --dry-run flag, got %v", capturedArgs)
