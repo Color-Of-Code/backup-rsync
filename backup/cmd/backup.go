@@ -11,12 +11,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func executeSyncJobs(cfg internal.Config, simulate bool) {
+func getLogPath(create bool) string {
 	logPath := fmt.Sprintf("logs/sync-%s", time.Now().Format("2006-01-02T15-04-05"))
-
-	if err := os.MkdirAll(logPath, 0755); err != nil {
-		log.Fatalf("Failed to create log directory: %v", err)
+	if create {
+		if err := os.MkdirAll(logPath, 0755); err != nil {
+			log.Fatalf("Failed to create log directory: %v", err)
+		}
 	}
+	return logPath
+}
+
+func executeSyncJobs(cfg internal.Config, simulate bool) {
+	logPath := getLogPath(true)
 
 	overallLogPath := fmt.Sprintf("%s/summary.log", logPath)
 	overallLogFile, err := os.OpenFile(overallLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -28,23 +34,17 @@ func executeSyncJobs(cfg internal.Config, simulate bool) {
 
 	for _, job := range cfg.Jobs {
 		jobLogPath := fmt.Sprintf("%s/job-%s.log", logPath, job.Name)
-		logFile, err := os.OpenFile(jobLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			overallLogger.Printf("ERROR [%s]: Failed to create job log file: %v", job.Name, err)
-			continue
-		}
-		defer logFile.Close()
-		jobLogger := log.New(logFile, "", log.LstdFlags)
-
-		status := internal.ExecuteJob(job, simulate, false, jobLogger)
+		status := internal.ExecuteJob(job, simulate, false, jobLogPath)
 		overallLogger.Printf("STATUS [%s]: %s", job.Name, status)
 		fmt.Printf("Status [%s]: %s\n", job.Name, status)
 	}
 }
 
-func listCommands(cfg internal.Config, simulate bool) {
+func listCommands(cfg internal.Config) {
+	logPath := getLogPath(false)
 	for _, job := range cfg.Jobs {
-		internal.ExecuteJob(job, simulate, true, nil)
+		jobLogPath := fmt.Sprintf("%s/job-%s.log", logPath, job.Name)
+		internal.ExecuteJob(job, false, true, jobLogPath)
 	}
 }
 
@@ -71,7 +71,7 @@ var listCmd = &cobra.Command{
 	Short: "List the commands that will be executed",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := loadResolvedConfig(configPath)
-		listCommands(cfg, true)
+		listCommands(cfg)
 	},
 }
 
