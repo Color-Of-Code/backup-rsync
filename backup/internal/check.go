@@ -53,7 +53,7 @@ func isCovered(path string, jobs []Job) bool {
 	return false
 }
 
-func listUncoveredPaths(fs afero.Fs, cfg Config) []string {
+func ListUncoveredPaths(fs afero.Fs, cfg Config) []string {
 	var result []string
 	seen := make(map[string]bool)
 

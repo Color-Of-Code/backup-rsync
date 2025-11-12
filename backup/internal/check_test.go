@@ -83,7 +83,7 @@ func runListUncoveredPathsTest(t *testing.T, fakeFS map[string][]string, cfg Con
 	}
 
 	// Call the function
-	uncoveredPaths := listUncoveredPaths(fs, cfg)
+	uncoveredPaths := ListUncoveredPaths(fs, cfg)
 
 	// Assertions
 	sort.Strings(uncoveredPaths)
