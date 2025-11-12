@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func buildRsyncCmd(job Job, dryRun bool) *exec.Cmd {
+func buildRsyncCmd(job Job, simulate bool) *exec.Cmd {
 	args := []string{"-aiv", "--info=progress2"}
 	if job.Delete == nil || *job.Delete {
 		args = append(args, "--delete")
@@ -16,22 +16,22 @@ func buildRsyncCmd(job Job, dryRun bool) *exec.Cmd {
 		args = append(args, fmt.Sprintf("--exclude=%s", excl))
 	}
 	args = append(args, job.Source, job.Target)
-	if dryRun {
+	if simulate {
 		args = append([]string{"--dry-run"}, args...)
 	}
 	return exec.Command("rsync", args...)
 }
 
-func executeJob(job Job, dryRun bool, logger *log.Logger) string {
+func ExecuteJob(job Job, simulate bool, logger *log.Logger) string {
 	if job.Enabled != nil && !*job.Enabled {
 		logger.Printf("SKIPPED [%s]: Job is disabled", job.Name)
 		return "SKIPPED"
 	}
 
-	cmd := buildRsyncCmd(job, dryRun)
+	cmd := buildRsyncCmd(job, simulate)
 	fmt.Printf("Job: %s\n", job.Name)
 	fmt.Printf("Command: %s\n", strings.Join(cmd.Args, " "))
-	if !dryRun {
+	if !simulate {
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			logger.Printf("ERROR [%s]: %v\nOutput: %s", job.Name, err, string(out))

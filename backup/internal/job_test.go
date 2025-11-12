@@ -44,7 +44,7 @@ func TestExecuteJob(t *testing.T) {
 	dryRun := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	status := executeJob(job, dryRun, logger)
+	status := ExecuteJob(job, dryRun, logger)
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
@@ -56,7 +56,7 @@ func TestExecuteJob(t *testing.T) {
 		Enabled: boolPtr(false),
 	}
 
-	status = executeJob(disabledJob, dryRun, logger)
+	status = ExecuteJob(disabledJob, dryRun, logger)
 	if status != "SKIPPED" {
 		t.Errorf("Expected status SKIPPED, got %s", status)
 	}
@@ -68,7 +68,7 @@ func TestExecuteJob(t *testing.T) {
 		Target: "/mnt/backup1/invalid/",
 	}
 
-	status = executeJob(invalidJob, false, logger)
+	status = ExecuteJob(invalidJob, false, logger)
 	if status != "FAILURE" {
 		t.Errorf("Expected status FAILURE, got %s", status)
 	}
@@ -84,7 +84,7 @@ func TestJobSkippedEnabledTrue(t *testing.T) {
 	dryRun := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	status := executeJob(job, dryRun, logger)
+	status := ExecuteJob(job, dryRun, logger)
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
@@ -100,7 +100,7 @@ func TestJobSkippedEnabledFalse(t *testing.T) {
 	dryRun := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	status := executeJob(disabledJob, dryRun, logger)
+	status := ExecuteJob(disabledJob, dryRun, logger)
 	if status != "SKIPPED" {
 		t.Errorf("Expected status SKIPPED, got %s", status)
 	}
@@ -115,7 +115,7 @@ func TestJobSkippedEnabledOmitted(t *testing.T) {
 	dryRun := true
 	logger := log.New(&bytes.Buffer{}, "", log.LstdFlags)
 
-	status := executeJob(job, dryRun, logger)
+	status := ExecuteJob(job, dryRun, logger)
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
