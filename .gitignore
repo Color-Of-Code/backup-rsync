@@ -1,3 +1,4 @@
+BACKLOG/
 logs/
-backup
 *.log
+dist/backup
