@@ -13,6 +13,13 @@ var RootCmd = &cobra.Command{
 	Long:  `backup-tool is a CLI tool for managing backups and configurations.`,
 }
 
+// Define a global configPath variable and flag at the root level
+var configPath string
+
+func init() {
+	RootCmd.PersistentFlags().StringVar(&configPath, "config", "config.yaml", "Path to the configuration file")
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {

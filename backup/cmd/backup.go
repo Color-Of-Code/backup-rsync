@@ -1,19 +1,31 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
-// backupCmd represents the backup command
-var backupCmd = &cobra.Command{
-	Use:   "backup",
-	Short: "Perform backup operations",
-	Long:  `The backup subcommand allows you to perform backup operations.`,
+// Add the run and simulate verbs with empty implementations
+var runCmd = &cobra.Command{
+	Use:   "run",
+	Short: "Run the backup jobs",
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement backup logic
+		// Empty implementation for now
+		fmt.Println("Run command executed.")
+	},
+}
+
+var simulateCmd = &cobra.Command{
+	Use:   "simulate",
+	Short: "Simulate the backup jobs",
+	Run: func(cmd *cobra.Command, args []string) {
+		// Empty implementation for now
+		fmt.Println("Simulate command executed.")
 	},
 }
 
 func init() {
-	RootCmd.AddCommand(backupCmd)
+	RootCmd.AddCommand(runCmd)
+	RootCmd.AddCommand(simulateCmd)
 }
