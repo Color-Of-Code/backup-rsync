@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// Helper function to create a pointer to a boolean value
-func boolPtr(b bool) *bool {
-	return &b
-}
-
 var capturedArgs []string
 
 var mockExecCommand = func(name string, args ...string) *exec.Cmd {
@@ -35,7 +30,7 @@ func TestBuildRsyncCmd(t *testing.T) {
 	job := Job{
 		Source:     "/home/user/Music/",
 		Target:     "/target/user/music/home",
-		Delete:     nil,
+		Delete:     true,
 		Exclusions: []string{"*.tmp", "node_modules/"},
 	}
 	args := buildRsyncCmd(job, true, "")
@@ -56,7 +51,8 @@ func TestExecuteJob(t *testing.T) {
 		Name:       "test_job",
 		Source:     "/home/test/",
 		Target:     "/mnt/backup1/test/",
-		Delete:     nil,
+		Delete:     true,
+		Enabled:    true,
 		Exclusions: []string{"*.tmp"},
 	}
 	simulate := true
@@ -70,7 +66,7 @@ func TestExecuteJob(t *testing.T) {
 		Name:    "disabled_job",
 		Source:  "/home/disabled/",
 		Target:  "/mnt/backup1/disabled/",
-		Enabled: boolPtr(false),
+		Enabled: false,
 	}
 
 	status = ExecuteJob(disabledJob, simulate, false, "")
@@ -80,9 +76,11 @@ func TestExecuteJob(t *testing.T) {
 
 	// Test case for failure (simulate by providing invalid source path)
 	invalidJob := Job{
-		Name:   "invalid_job",
-		Source: "/invalid/source/path",
-		Target: "/mnt/backup1/invalid/",
+		Name:    "invalid_job",
+		Source:  "/invalid/source/path",
+		Target:  "/mnt/backup1/invalid/",
+		Delete:  true,
+		Enabled: true,
 	}
 
 	status = ExecuteJob(invalidJob, false, false, "")
@@ -96,7 +94,7 @@ func TestJobSkippedEnabledTrue(t *testing.T) {
 		Name:    "test_job",
 		Source:  "/home/test/",
 		Target:  "/mnt/backup1/test/",
-		Enabled: boolPtr(true),
+		Enabled: true,
 	}
 	status := ExecuteJob(job, true, false, "")
 	if status != "SUCCESS" {
@@ -109,7 +107,7 @@ func TestJobSkippedEnabledFalse(t *testing.T) {
 		Name:    "disabled_job",
 		Source:  "/home/disabled/",
 		Target:  "/mnt/backup1/disabled/",
-		Enabled: boolPtr(false),
+		Enabled: false,
 	}
 	status := ExecuteJob(disabledJob, true, false, "")
 	if status != "SKIPPED" {
@@ -119,9 +117,11 @@ func TestJobSkippedEnabledFalse(t *testing.T) {
 
 func TestJobSkippedEnabledOmitted(t *testing.T) {
 	job := Job{
-		Name:   "omitted_enabled_job",
-		Source: "/home/omitted/",
-		Target: "/mnt/backup1/omitted/",
+		Name:    "omitted_enabled_job",
+		Source:  "/home/omitted/",
+		Target:  "/mnt/backup1/omitted/",
+		Delete:  true,
+		Enabled: true,
 	}
 	status := ExecuteJob(job, true, false, "")
 	if status != "SUCCESS" {
@@ -137,7 +137,8 @@ func TestExecuteJobWithMockedRsync(t *testing.T) {
 		Name:       "test_job",
 		Source:     "/home/test/",
 		Target:     "/mnt/backup1/test/",
-		Delete:     nil,
+		Delete:     true,
+		Enabled:    true,
 		Exclusions: []string{"*.tmp"},
 	}
 	status := ExecuteJob(job, true, false, "")

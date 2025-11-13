@@ -1,26 +1,15 @@
-package cmd
+package internal
 
 import (
 	"bytes"
+	"reflect"
 	"strings"
 	"testing"
 
-	"backup-rsync/backup/internal"
+	"gopkg.in/yaml.v3"
 )
 
-func TestSubstituteVariables(t *testing.T) {
-	variables := map[string]string{
-		"target_base": "/mnt/backup1",
-	}
-	input := "${target_base}/user/music/home"
-	expected := "/mnt/backup1/user/music/home"
-	result := substituteVariables(input, variables)
-	if result != expected {
-		t.Errorf("Expected %s, got %s", expected, result)
-	}
-}
-
-func TestLoadConfig(t *testing.T) {
+func TestLoadConfig1(t *testing.T) {
 	yamlData := `
 variables:
   target_base: "/mnt/backup1"
@@ -32,7 +21,7 @@ jobs:
     enabled: true
 `
 	reader := bytes.NewReader([]byte(yamlData))
-	cfg, err := loadConfig(reader)
+	cfg, err := LoadConfig(reader)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -57,16 +46,140 @@ jobs:
 	}
 }
 
+func TestLoadConfig2(t *testing.T) {
+	yamlData := `
+jobs:
+  - name: "job1"
+    source: "/source1"
+    target: "/target1"
+  - name: "job2"
+    source: "/source2"
+    target: "/target2"
+    delete: false
+    enabled: false
+`
+
+	// Use a reader instead of a mock file
+	reader := bytes.NewReader([]byte(yamlData))
+	cfg, err := LoadConfig(reader)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	expected := []Job{
+		{
+			Name:    "job1",
+			Source:  "/source1",
+			Target:  "/target1",
+			Delete:  true,
+			Enabled: true,
+		},
+		{
+			Name:    "job2",
+			Source:  "/source2",
+			Target:  "/target2",
+			Delete:  false,
+			Enabled: false,
+		},
+	}
+
+	if !reflect.DeepEqual(cfg.Jobs, expected) {
+		t.Errorf("got %+v, want %+v", cfg.Jobs, expected)
+	}
+}
+
+func TestYAMLUnmarshalingDefaults(t *testing.T) {
+	tests := []struct {
+		name     string
+		yamlData string
+		expected Job
+	}{
+		{
+			name: "Defaults applied when fields omitted",
+			yamlData: `
+name: "test_job"
+source: "/source"
+target: "/target"
+`,
+			expected: Job{
+				Name:    "test_job",
+				Source:  "/source",
+				Target:  "/target",
+				Delete:  true,
+				Enabled: true,
+			},
+		},
+		{
+			name: "Explicit false values preserved",
+			yamlData: `
+name: "test_job"
+source: "/source"
+target: "/target"
+delete: false
+enabled: false
+`,
+			expected: Job{
+				Name:    "test_job",
+				Source:  "/source",
+				Target:  "/target",
+				Delete:  false,
+				Enabled: false,
+			},
+		},
+		{
+			name: "Mixed explicit and default values",
+			yamlData: `
+name: "test_job"
+source: "/source"
+target: "/target"
+delete: false
+`,
+			expected: Job{
+				Name:    "test_job",
+				Source:  "/source",
+				Target:  "/target",
+				Delete:  false,
+				Enabled: true, // default
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var job Job
+			err := yaml.Unmarshal([]byte(tt.yamlData), &job)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal YAML: %v", err)
+			}
+			if !reflect.DeepEqual(job, tt.expected) {
+				t.Errorf("got %+v, want %+v", job, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSubstituteVariables(t *testing.T) {
+	variables := map[string]string{
+		"target_base": "/mnt/backup1",
+	}
+	input := "${target_base}/user/music/home"
+	expected := "/mnt/backup1/user/music/home"
+	result := substituteVariables(input, variables)
+	if result != expected {
+		t.Errorf("Expected %s, got %s", expected, result)
+	}
+}
+
 func TestValidateJobNames(t *testing.T) {
 	tests := []struct {
 		name         string
-		jobs         []internal.Job
+		jobs         []Job
 		expectsError bool
 		errorMessage string
 	}{
 		{
 			name: "Valid job names",
-			jobs: []internal.Job{
+			jobs: []Job{
 				{Name: "job1"},
 				{Name: "job2"},
 			},
@@ -74,7 +187,7 @@ func TestValidateJobNames(t *testing.T) {
 		},
 		{
 			name: "Duplicate job names",
-			jobs: []internal.Job{
+			jobs: []Job{
 				{Name: "job1"},
 				{Name: "job1"},
 			},
@@ -83,7 +196,7 @@ func TestValidateJobNames(t *testing.T) {
 		},
 		{
 			name: "Invalid characters in job name",
-			jobs: []internal.Job{
+			jobs: []Job{
 				{Name: "job 1"},
 			},
 			expectsError: true,
@@ -91,7 +204,7 @@ func TestValidateJobNames(t *testing.T) {
 		},
 		{
 			name: "Mixed errors",
-			jobs: []internal.Job{
+			jobs: []Job{
 				{Name: "job1"},
 				{Name: "job 1"},
 				{Name: "job1"},
@@ -123,7 +236,7 @@ func TestValidatePath(t *testing.T) {
 	tests := []struct {
 		name         string
 		jobPath      string
-		paths        []internal.Path
+		paths        []Path
 		pathType     string
 		jobName      string
 		expectsError bool
@@ -132,7 +245,7 @@ func TestValidatePath(t *testing.T) {
 		{
 			name:         "Valid source path",
 			jobPath:      "/home/user/documents",
-			paths:        []internal.Path{{Path: "/home/user"}},
+			paths:        []Path{{Path: "/home/user"}},
 			pathType:     "source",
 			jobName:      "job1",
 			expectsError: false,
@@ -140,7 +253,7 @@ func TestValidatePath(t *testing.T) {
 		{
 			name:         "Invalid source path",
 			jobPath:      "/invalid/source",
-			paths:        []internal.Path{{Path: "/home/user"}},
+			paths:        []Path{{Path: "/home/user"}},
 			pathType:     "source",
 			jobName:      "job1",
 			expectsError: true,
@@ -149,7 +262,7 @@ func TestValidatePath(t *testing.T) {
 		{
 			name:         "Valid target path",
 			jobPath:      "/mnt/backup/documents",
-			paths:        []internal.Path{{Path: "/mnt/backup"}},
+			paths:        []Path{{Path: "/mnt/backup"}},
 			pathType:     "target",
 			jobName:      "job1",
 			expectsError: false,
@@ -157,7 +270,7 @@ func TestValidatePath(t *testing.T) {
 		{
 			name:         "Invalid target path",
 			jobPath:      "/invalid/target",
-			paths:        []internal.Path{{Path: "/mnt/backup"}},
+			paths:        []Path{{Path: "/mnt/backup"}},
 			pathType:     "target",
 			jobName:      "job1",
 			expectsError: true,
@@ -186,20 +299,20 @@ func TestValidatePath(t *testing.T) {
 func TestValidatePaths(t *testing.T) {
 	tests := []struct {
 		name         string
-		cfg          internal.Config
+		cfg          Config
 		expectsError bool
 		errorMessage string
 	}{
 		{
 			name: "Valid paths",
-			cfg: internal.Config{
-				Sources: []internal.Path{
+			cfg: Config{
+				Sources: []Path{
 					{Path: "/home/user"},
 				},
-				Targets: []internal.Path{
+				Targets: []Path{
 					{Path: "/mnt/backup"},
 				},
-				Jobs: []internal.Job{
+				Jobs: []Job{
 					{Name: "job1", Source: "/home/user/documents", Target: "/mnt/backup/documents"},
 				},
 			},
@@ -207,14 +320,14 @@ func TestValidatePaths(t *testing.T) {
 		},
 		{
 			name: "Invalid paths",
-			cfg: internal.Config{
-				Sources: []internal.Path{
+			cfg: Config{
+				Sources: []Path{
 					{Path: "/home/user"},
 				},
-				Targets: []internal.Path{
+				Targets: []Path{
 					{Path: "/mnt/backup"},
 				},
-				Jobs: []internal.Job{
+				Jobs: []Job{
 					{Name: "job1", Source: "/invalid/source", Target: "/invalid/target"},
 				},
 			},

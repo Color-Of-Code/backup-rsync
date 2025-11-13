@@ -52,7 +52,7 @@ var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Execute the sync jobs",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg := loadResolvedConfig(configPath)
+		cfg := internal.LoadResolvedConfig(configPath)
 		executeSyncJobs(cfg, false)
 	},
 }
@@ -61,7 +61,7 @@ var simulateCmd = &cobra.Command{
 	Use:   "simulate",
 	Short: "Simulate the sync jobs",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg := loadResolvedConfig(configPath)
+		cfg := internal.LoadResolvedConfig(configPath)
 		executeSyncJobs(cfg, true)
 	},
 }
@@ -70,7 +70,7 @@ var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List the commands that will be executed",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg := loadResolvedConfig(configPath)
+		cfg := internal.LoadResolvedConfig(configPath)
 		listCommands(cfg)
 	},
 }

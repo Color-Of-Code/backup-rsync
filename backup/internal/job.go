@@ -10,7 +10,7 @@ var execCommand = exec.Command
 
 func buildRsyncCmd(job Job, simulate bool, logPath string) []string {
 	args := []string{"-aiv", "--stats"}
-	if job.Delete == nil || *job.Delete {
+	if job.Delete {
 		args = append(args, "--delete")
 	}
 	if logPath != "" {
@@ -27,7 +27,7 @@ func buildRsyncCmd(job Job, simulate bool, logPath string) []string {
 }
 
 func ExecuteJob(job Job, simulate bool, show bool, logPath string) string {
-	if job.Enabled != nil && !*job.Enabled {
+	if !job.Enabled {
 		return "SKIPPED"
 	}
 

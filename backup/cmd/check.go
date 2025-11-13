@@ -15,7 +15,7 @@ var checkCmd = &cobra.Command{
 	Use:   "check-coverage",
 	Short: "Check path coverage",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg := loadResolvedConfig(configPath)
+		cfg := internal.LoadResolvedConfig(configPath)
 		uncoveredPaths := internal.ListUncoveredPaths(AppFs, cfg)
 		fmt.Println("Uncovered paths:")
 		for _, path := range uncoveredPaths {
