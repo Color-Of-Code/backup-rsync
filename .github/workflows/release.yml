@@ -1,0 +1,77 @@
+name: Release Workflow
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build and Release Binaries
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.24
+
+      - name: Build binary
+        run: |
+          mkdir -p dist
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o dist/backup-${{ matrix.goos }}-${{ matrix.goarch }} ./backup/main.go 
+
+      - name: Generate SHA256 checksum
+        run: |
+          for file in dist/*; do
+            sha256sum "$file" > "$file.sha256";
+          done
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/backup-${{ matrix.goos }}-${{ matrix.goarch }}
+
+      - name: Upload SHA256 checksum files
+        uses: actions/upload-artifact@v4
+        with:
+          name: sha256-checksums-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*.sha256
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: dist/*
+          generateReleaseNotes: true
+          immutableCreate: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            Release ${{ github.ref_name }} includes binaries for the following platforms:
+            - Linux (amd64, arm64)
+            - macOS (amd64, arm64)
+            - Windows (amd64, arm64)
