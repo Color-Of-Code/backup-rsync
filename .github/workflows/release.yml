@@ -28,7 +28,7 @@ jobs:
       - name: Build binary
         run: |
           mkdir -p dist
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o dist/backup-${{ matrix.goos }}-${{ matrix.goarch }} ./backup/main.go 
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o dist/backup-${{ matrix.goos }}-${{ matrix.goarch }} ./backup/main.go 
 
       - name: Generate SHA256 checksum
         run: |
