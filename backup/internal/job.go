@@ -1,12 +1,27 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
 )
 
-var ExecCommand = exec.Command
+// CommandExecutor interface for executing commands.
+type CommandExecutor interface {
+	Execute(name string, args ...string) ([]byte, error)
+}
+
+// RealCommandExecutor implements CommandExecutor using actual os/exec.
+type RealCommandExecutor struct{}
+
+// Execute runs the actual command.
+func (r *RealCommandExecutor) Execute(name string, args ...string) ([]byte, error) {
+	ctx := context.Background()
+	cmd := exec.CommandContext(ctx, name, args...)
+
+	return cmd.CombinedOutput()
+}
 
 func BuildRsyncCmd(job Job, simulate bool, logPath string) []string {
 	args := []string{"-aiv", "--stats"}
@@ -31,6 +46,12 @@ func BuildRsyncCmd(job Job, simulate bool, logPath string) []string {
 }
 
 func ExecuteJob(job Job, simulate bool, show bool, logPath string) string {
+	var osExec CommandExecutor = &RealCommandExecutor{}
+
+	return ExecuteJobWithExecutor(job, simulate, show, logPath, osExec)
+}
+
+func ExecuteJobWithExecutor(job Job, simulate bool, show bool, logPath string, executor CommandExecutor) string {
 	if !job.Enabled {
 		return "SKIPPED"
 	}
@@ -43,8 +64,7 @@ func ExecuteJob(job Job, simulate bool, show bool, logPath string) string {
 		return "SUCCESS"
 	}
 
-	cmd := ExecCommand("rsync", args...)
-	out, err := cmd.CombinedOutput()
+	out, err := executor.Execute("rsync", args...)
 	fmt.Printf("Output:\n%s\n", string(out))
 
 	if err != nil {

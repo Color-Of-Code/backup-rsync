@@ -1,7 +1,7 @@
 package internal_test
 
 import (
-	"os/exec"
+	"errors"
 	"strings"
 	"testing"
 
@@ -10,29 +10,42 @@ import (
 
 const statusSuccess = "SUCCESS"
 
-var capturedArgs []string
-
-var mockExecCommand = func(name string, args ...string) *exec.Cmd {
-	if name == "rsync" {
-		capturedArgs = append(capturedArgs, args...) // Append arguments for assertions
-		if strings.Contains(strings.Join(args, " "), "--dry-run") {
-			return exec.Command("echo", "mocked rsync success") // Simulate success for dry-run
-		}
-		if strings.Contains(strings.Join(args, " "), "/invalid/source/path") {
-			return exec.Command("false") // Simulate failure for invalid paths
-		}
-
-		return exec.Command("echo", "mocked rsync success") // Simulate general success
-	}
-
-	return exec.Command(name, args...)
+// MockCommandExecutor implements CommandExecutor for testing.
+type MockCommandExecutor struct {
+	CapturedCommands []MockCommand
 }
 
-func init() {
-	internal.ExecCommand = mockExecCommand
+// MockCommand represents a captured command execution.
+type MockCommand struct {
+	Name string
+	Args []string
+}
+
+// Execute captures the command and simulates execution.
+func (m *MockCommandExecutor) Execute(name string, args ...string) ([]byte, error) {
+	m.CapturedCommands = append(m.CapturedCommands, MockCommand{
+		Name: name,
+		Args: append([]string{}, args...), // Make a copy of args
+	})
+
+	if name == "rsync" {
+		// Simulate different scenarios based on arguments
+		argsStr := strings.Join(args, " ")
+
+		if strings.Contains(argsStr, "/invalid/source/path") {
+			errMsg := "rsync: link_stat \"/invalid/source/path\" failed: No such file or directory"
+
+			return []byte(errMsg), errors.New("exit status 23")
+		}
+
+		return []byte("mocked rsync success"), nil
+	}
+
+	return []byte("command not mocked"), nil
 }
 
 func TestBuildRsyncCmd(t *testing.T) {
+	// This test doesn't need mocking since it only builds args
 	job := internal.Job{
 		Source:     "/home/user/Music/",
 		Target:     "/target/user/music/home",
@@ -53,6 +66,9 @@ func TestBuildRsyncCmd(t *testing.T) {
 }
 
 func TestExecuteJob(t *testing.T) {
+	// Create mock executor
+	mockExecutor := &MockCommandExecutor{}
+
 	job := internal.Job{
 		Name:       "test_job",
 		Source:     "/home/test/",
@@ -63,7 +79,7 @@ func TestExecuteJob(t *testing.T) {
 	}
 	simulate := true
 
-	status := internal.ExecuteJob(job, simulate, false, "")
+	status := internal.ExecuteJobWithExecutor(job, simulate, false, "", mockExecutor)
 	if status != statusSuccess {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
@@ -75,7 +91,7 @@ func TestExecuteJob(t *testing.T) {
 		Enabled: false,
 	}
 
-	status = internal.ExecuteJob(disabledJob, simulate, false, "")
+	status = internal.ExecuteJobWithExecutor(disabledJob, simulate, false, "", mockExecutor)
 	if status != "SKIPPED" {
 		t.Errorf("Expected status SKIPPED, got %s", status)
 	}
@@ -89,7 +105,7 @@ func TestExecuteJob(t *testing.T) {
 		Enabled: true,
 	}
 
-	status = internal.ExecuteJob(invalidJob, false, false, "")
+	status = internal.ExecuteJobWithExecutor(invalidJob, false, false, "", mockExecutor)
 	if status != "FAILURE" {
 		t.Errorf("Expected status FAILURE, got %s", status)
 	}
@@ -97,6 +113,9 @@ func TestExecuteJob(t *testing.T) {
 
 // Ensure all references to ExecuteJob are prefixed with internal.
 func TestJobSkippedEnabledTrue(t *testing.T) {
+	// Create mock executor
+	mockExecutor := &MockCommandExecutor{}
+
 	job := internal.Job{
 		Name:    "test_job",
 		Source:  "/home/test/",
@@ -104,13 +123,16 @@ func TestJobSkippedEnabledTrue(t *testing.T) {
 		Enabled: true,
 	}
 
-	status := internal.ExecuteJob(job, true, false, "")
+	status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
 	if status != statusSuccess {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
 }
 
 func TestJobSkippedEnabledFalse(t *testing.T) {
+	// Create mock executor (won't be used since job is disabled)
+	mockExecutor := &MockCommandExecutor{}
+
 	disabledJob := internal.Job{
 		Name:    "disabled_job",
 		Source:  "/home/disabled/",
@@ -118,13 +140,16 @@ func TestJobSkippedEnabledFalse(t *testing.T) {
 		Enabled: false,
 	}
 
-	status := internal.ExecuteJob(disabledJob, true, false, "")
+	status := internal.ExecuteJobWithExecutor(disabledJob, true, false, "", mockExecutor)
 	if status != "SKIPPED" {
 		t.Errorf("Expected status SKIPPED, got %s", status)
 	}
 }
 
 func TestJobSkippedEnabledOmitted(t *testing.T) {
+	// Create mock executor
+	mockExecutor := &MockCommandExecutor{}
+
 	job := internal.Job{
 		Name:    "omitted_enabled_job",
 		Source:  "/home/omitted/",
@@ -133,15 +158,15 @@ func TestJobSkippedEnabledOmitted(t *testing.T) {
 		Enabled: true,
 	}
 
-	status := internal.ExecuteJob(job, true, false, "")
+	status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
 	if status != statusSuccess {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
 }
 
 func TestExecuteJobWithMockedRsync(t *testing.T) {
-	// Reset capturedArgs before the test
-	capturedArgs = nil
+	// Create mock executor
+	mockExecutor := &MockCommandExecutor{}
 
 	job := internal.Job{
 		Name:       "test_job",
@@ -151,13 +176,25 @@ func TestExecuteJobWithMockedRsync(t *testing.T) {
 		Enabled:    true,
 		Exclusions: []string{"*.tmp"},
 	}
-	status := internal.ExecuteJob(job, true, false, "")
+	status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
 
 	if status != statusSuccess {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
 
-	if len(capturedArgs) == 0 || capturedArgs[0] != "--dry-run" {
-		t.Errorf("Expected --dry-run flag, got %v", capturedArgs)
+	// Check that rsync was called with the expected arguments
+	if len(mockExecutor.CapturedCommands) == 0 {
+		t.Errorf("Expected at least one command to be executed")
+
+		return
+	}
+
+	cmd := mockExecutor.CapturedCommands[0]
+	if cmd.Name != "rsync" {
+		t.Errorf("Expected command to be 'rsync', got %s", cmd.Name)
+	}
+
+	if len(cmd.Args) == 0 || cmd.Args[0] != "--dry-run" {
+		t.Errorf("Expected --dry-run flag, got %v", cmd.Args)
 	}
 }
