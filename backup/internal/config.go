@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -11,12 +12,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Static errors for wrapping..
+var (
+	ErrJobValidation   = errors.New("job validation failed")
+	ErrInvalidPath     = errors.New("invalid path")
+	ErrPathValidation  = errors.New("path validation failed")
+	ErrOverlappingPath = errors.New("overlapping path detected")
+)
+
 func LoadConfig(reader io.Reader) (Config, error) {
 	var cfg Config
 
 	err := yaml.NewDecoder(reader).Decode(&cfg)
 	if err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("failed to decode YAML: %w", err)
 	}
 
 	// Defaults are handled in Job.UnmarshalYAML
@@ -64,7 +73,7 @@ func ValidateJobNames(jobs []Job) error {
 	}
 
 	if len(invalidNames) > 0 {
-		return fmt.Errorf("job validation errors: %v", invalidNames)
+		return fmt.Errorf("%w: %v", ErrJobValidation, invalidNames)
 	}
 
 	return nil
@@ -77,7 +86,7 @@ func ValidatePath(jobPath string, paths []Path, pathType string, jobName string)
 		}
 	}
 
-	return fmt.Errorf("invalid %s path for job '%s': %s", pathType, jobName, jobPath)
+	return fmt.Errorf("%w for job '%s': %s %s", ErrInvalidPath, jobName, pathType, jobPath)
 }
 
 func ValidatePaths(cfg Config) error {
@@ -96,7 +105,7 @@ func ValidatePaths(cfg Config) error {
 	}
 
 	if len(invalidPaths) > 0 {
-		return fmt.Errorf("path validation errors: %v", invalidPaths)
+		return fmt.Errorf("%w: %v", ErrPathValidation, invalidPaths)
 	}
 
 	return nil
@@ -124,7 +133,8 @@ func validateJobPaths(jobs []Job, pathType string, getPath func(job Job) string)
 				}
 
 				if !excluded && strings.HasPrefix(path1, path2) {
-					return fmt.Errorf("Job '%s' has a %s path overlapping with job '%s'", job1.Name, pathType, job2.Name)
+					return fmt.Errorf("%w: job '%s' has a %s path overlapping with job '%s'",
+						ErrOverlappingPath, job1.Name, pathType, job2.Name)
 				}
 			}
 		}
@@ -134,13 +144,13 @@ func validateJobPaths(jobs []Job, pathType string, getPath func(job Job) string)
 }
 
 func LoadResolvedConfig(configPath string) Config {
-	f, err := os.Open(configPath)
+	configFile, err := os.Open(configPath)
 	if err != nil {
 		log.Fatalf("Failed to open config: %v", err)
 	}
-	defer f.Close()
+	defer configFile.Close()
 
-	cfg, err := LoadConfig(f)
+	cfg, err := LoadConfig(configFile)
 	if err != nil {
 		log.Fatalf("Failed to parse YAML: %v", err)
 	}

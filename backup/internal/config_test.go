@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"bytes"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -89,8 +88,8 @@ jobs:
 		},
 	}
 
-	if !reflect.DeepEqual(cfg.Jobs, expected) {
-		t.Errorf("got %+v, want %+v", cfg.Jobs, expected)
+	for i, job := range cfg.Jobs {
+		assertJobEqual(t, job, expected[i])
 	}
 }
 
@@ -115,9 +114,7 @@ target: "/target"
 		t.Fatalf("Failed to unmarshal YAML: %v", err)
 	}
 
-	if !reflect.DeepEqual(job, expected) {
-		t.Errorf("got %+v, want %+v", job, expected)
-	}
+	assertJobEqual(t, job, expected)
 }
 
 func TestYAMLUnmarshalingDefaults_ExplicitFalseValues(t *testing.T) {
@@ -143,9 +140,7 @@ enabled: false
 		t.Fatalf("Failed to unmarshal YAML: %v", err)
 	}
 
-	if !reflect.DeepEqual(job, expected) {
-		t.Errorf("got %+v, want %+v", job, expected)
-	}
+	assertJobEqual(t, job, expected)
 }
 
 func TestYAMLUnmarshalingDefaults_MixedValues(t *testing.T) {
@@ -170,9 +165,7 @@ delete: false
 		t.Fatalf("Failed to unmarshal YAML: %v", err)
 	}
 
-	if !reflect.DeepEqual(job, expected) {
-		t.Errorf("got %+v, want %+v", job, expected)
-	}
+	assertJobEqual(t, job, expected)
 }
 
 func TestSubstituteVariables(t *testing.T) {
@@ -295,7 +288,7 @@ func TestValidatePath_InvalidSourcePath(t *testing.T) {
 		paths:        []internal.Path{{Path: "/home/user"}},
 		pathType:     "source",
 		jobName:      "job1",
-		errorMessage: "invalid source path for job 'job1': /invalid/source",
+		errorMessage: "invalid path for job 'job1': source /invalid/source",
 	}
 
 	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, test.jobName)
@@ -331,7 +324,7 @@ func TestValidatePath_InvalidTargetPath(t *testing.T) {
 		paths:        []internal.Path{{Path: "/mnt/backup"}},
 		pathType:     "target",
 		jobName:      "job1",
-		errorMessage: "invalid target path for job 'job1': /invalid/target",
+		errorMessage: "invalid path for job 'job1': target /invalid/target",
 	}
 
 	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, test.jobName)
@@ -374,9 +367,9 @@ func TestValidatePaths(t *testing.T) {
 				},
 			},
 			expectsError: true,
-			errorMessage: "path validation errors: [" +
-				"invalid source path for job 'job1': /invalid/source " +
-				"invalid target path for job 'job1': /invalid/target]",
+			errorMessage: "path validation failed: [" +
+				"invalid path for job 'job1': source /invalid/source " +
+				"invalid path for job 'job1': target /invalid/target]",
 		},
 	}
 
@@ -389,5 +382,29 @@ func TestValidatePaths(t *testing.T) {
 				expectNoError(t, err)
 			}
 		})
+	}
+}
+
+func assertJobEqual(t *testing.T, got, expected internal.Job) {
+	t.Helper()
+
+	if got.Name != expected.Name {
+		t.Errorf("Job name mismatch: got %s, want %s", got.Name, expected.Name)
+	}
+
+	if got.Source != expected.Source {
+		t.Errorf("Job source mismatch: got %s, want %s", got.Source, expected.Source)
+	}
+
+	if got.Target != expected.Target {
+		t.Errorf("Job target mismatch: got %s, want %s", got.Target, expected.Target)
+	}
+
+	if got.Delete != expected.Delete {
+		t.Errorf("Job delete flag mismatch: got %v, want %v", got.Delete, expected.Delete)
+	}
+
+	if got.Enabled != expected.Enabled {
+		t.Errorf("Job enabled flag mismatch: got %v, want %v", got.Enabled, expected.Enabled)
 	}
 }

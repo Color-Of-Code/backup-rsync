@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"fmt"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -46,7 +48,7 @@ func (j *Job) UnmarshalYAML(node *yaml.Node) error {
 
 	err := node.Decode(&jobYAML)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to decode YAML node: %w", err)
 	}
 
 	// Copy basic fields

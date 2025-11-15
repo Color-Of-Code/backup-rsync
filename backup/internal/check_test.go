@@ -102,15 +102,15 @@ func runListUncoveredPathsTest(
 		return
 	}
 
-	for i, path := range uncoveredPaths {
-		if i >= len(expectedUncoveredPaths) {
+	for count, path := range uncoveredPaths {
+		if count >= len(expectedUncoveredPaths) {
 			t.Errorf("Got more uncovered paths than expected. Got: %v", uncoveredPaths)
 
 			return
 		}
 
-		if path != expectedUncoveredPaths[i] {
-			t.Errorf("Expected uncovered path '%s', got '%s'", expectedUncoveredPaths[i], path)
+		if path != expectedUncoveredPaths[count] {
+			t.Errorf("Expected uncovered path '%s', got '%s'", expectedUncoveredPaths[count], path)
 		}
 	}
 }

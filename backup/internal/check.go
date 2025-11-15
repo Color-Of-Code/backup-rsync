@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"log"
 	"path/filepath"
 	"sort"
@@ -147,7 +148,7 @@ func getChildDirectories(fs afero.Fs, path string) ([]string, error) {
 
 	fileInfos, err := afero.ReadDir(fs, path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read directory '%s': %w", path, err)
 	}
 
 	for _, info := range fileInfos {

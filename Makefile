@@ -4,13 +4,18 @@
 BUILD_CMD = CGO_ENABLED=0 go build -ldflags="-s -w"
 PACKAGE = ./backup/main.go
 
-.PHONY: build clean test lint tidy checksums release sanity-check check-mod-tidy
+.PHONY: build clean test lint tidy checksums release sanity-check check-mod-tidy lint-config-check  lint-fix format check-clean
 
 format:
 	go fmt ./...
 	@echo "OK: Code formatted."
 
-lint:
+lint-config-check:
+	@golangci-lint config path
+	@golangci-lint config verify
+	@echo "OK: Lint configuration is valid."
+
+lint: lint-config-check
 	golangci-lint run ./...
 
 lint-fix:

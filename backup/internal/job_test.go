@@ -8,6 +8,9 @@ import (
 	"backup-rsync/backup/internal"
 )
 
+// Static error for testing.
+var ErrExitStatus23 = errors.New("exit status 23")
+
 const statusSuccess = "SUCCESS"
 
 // MockCommandExecutor implements CommandExecutor for testing.
@@ -35,7 +38,7 @@ func (m *MockCommandExecutor) Execute(name string, args ...string) ([]byte, erro
 		if strings.Contains(argsStr, "/invalid/source/path") {
 			errMsg := "rsync: link_stat \"/invalid/source/path\" failed: No such file or directory"
 
-			return []byte(errMsg), errors.New("exit status 23")
+			return []byte(errMsg), ErrExitStatus23
 		}
 
 		return []byte("mocked rsync success"), nil

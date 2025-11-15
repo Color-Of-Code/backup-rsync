@@ -20,7 +20,12 @@ func (r *RealCommandExecutor) Execute(name string, args ...string) ([]byte, erro
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, name, args...)
 
-	return cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute command '%s %s': %w", name, strings.Join(args, " "), err)
+	}
+
+	return output, nil
 }
 
 func BuildRsyncCmd(job Job, simulate bool, logPath string) []string {

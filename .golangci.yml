@@ -5,25 +5,40 @@ linters:
     - wsl # The linter 'wsl' is deprecated (since v2.2.0) due to: new major version. Replaced by wsl_v5
     - paralleltest # not used in this project
     - revive # temporarily disable
-    - exhaustruct # temporarily disable
-    - depguard
-    - err113
     - errcheck
     - forbidigo
     - gocritic
     - godoclint
     - gosec
-    - varnamelen
-    - wrapcheck
   settings:
+    depguard:
+      rules:
+        main:
+          list-mode: strict
+          allow:
+            - bytes
+            - context
+            - errors
+            - fmt
+            - io
+            - log
+            - os
+            - path/filepath
+            - sort
+            - strings
+            - testing
+            - time
+            - github.com/spf13/cobra
+            - github.com/spf13/afero
+            - gopkg.in/yaml.v3
+            - backup-rsync/backup/internal
+            - backup-rsync/backup/cmd
     errcheck:
       check-type-assertions: true
       check-blank: true
-    staticcheck:
-      checks: all
     varnamelen:
       ignore-decls:
-        fs afero.Fs
+        - fs afero.Fs
 formatters:
   enable:
     - gofmt
