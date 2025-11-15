@@ -264,35 +264,29 @@ func TestValidatePath_ValidSourcePath(t *testing.T) {
 		jobPath  string
 		paths    []internal.Path
 		pathType string
-		jobName  string
 	}{
 		jobPath:  "/home/user/documents",
 		paths:    []internal.Path{{Path: "/home/user"}},
 		pathType: "source",
-		jobName:  "job1",
 	}
 
-	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, test.jobName)
+	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
 	expectNoError(t, err)
 }
 
 func TestValidatePath_InvalidSourcePath(t *testing.T) {
 	test := struct {
-		jobPath      string
-		paths        []internal.Path
-		pathType     string
-		jobName      string
-		errorMessage string
+		jobPath  string
+		paths    []internal.Path
+		pathType string
 	}{
-		jobPath:      "/invalid/source",
-		paths:        []internal.Path{{Path: "/home/user"}},
-		pathType:     "source",
-		jobName:      "job1",
-		errorMessage: "invalid path for job 'job1': source /invalid/source",
+		jobPath:  "/invalid/source",
+		paths:    []internal.Path{{Path: "/home/user"}},
+		pathType: "source",
 	}
 
-	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, test.jobName)
-	expectError(t, err, test.errorMessage)
+	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
+	expectError(t, err, "invalid path for job 'job1': source /invalid/source")
 }
 
 func TestValidatePath_ValidTargetPath(t *testing.T) {
@@ -300,35 +294,29 @@ func TestValidatePath_ValidTargetPath(t *testing.T) {
 		jobPath  string
 		paths    []internal.Path
 		pathType string
-		jobName  string
 	}{
 		jobPath:  "/mnt/backup/documents",
 		paths:    []internal.Path{{Path: "/mnt/backup"}},
 		pathType: "target",
-		jobName:  "job1",
 	}
 
-	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, test.jobName)
+	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
 	expectNoError(t, err)
 }
 
 func TestValidatePath_InvalidTargetPath(t *testing.T) {
 	test := struct {
-		jobPath      string
-		paths        []internal.Path
-		pathType     string
-		jobName      string
-		errorMessage string
+		jobPath  string
+		paths    []internal.Path
+		pathType string
 	}{
-		jobPath:      "/invalid/target",
-		paths:        []internal.Path{{Path: "/mnt/backup"}},
-		pathType:     "target",
-		jobName:      "job1",
-		errorMessage: "invalid path for job 'job1': target /invalid/target",
+		jobPath:  "/invalid/target",
+		paths:    []internal.Path{{Path: "/mnt/backup"}},
+		pathType: "target",
 	}
 
-	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, test.jobName)
-	expectError(t, err, test.errorMessage)
+	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
+	expectError(t, err, "invalid path for job 'job1': target /invalid/target")
 }
 
 func TestValidatePaths(t *testing.T) {

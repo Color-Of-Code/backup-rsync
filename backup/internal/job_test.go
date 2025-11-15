@@ -24,6 +24,59 @@ type MockCommand struct {
 	Args []string
 }
 
+// Option defines a function that modifies a Job.
+type Option func(*internal.Job)
+
+// NewJob is a job factory with defaults.
+func NewJob(opts ...Option) *internal.Job {
+	// Default values
+	job := &internal.Job{
+		Name:       "job",
+		Source:     "",
+		Target:     "",
+		Delete:     true,
+		Enabled:    true,
+		Exclusions: []string{},
+	}
+
+	// Apply all options (overrides defaults)
+	for _, opt := range opts {
+		opt(job)
+	}
+
+	return job
+}
+
+func WithName(name string) Option {
+	return func(p *internal.Job) {
+		p.Name = name
+	}
+}
+
+func WithSource(source string) Option {
+	return func(p *internal.Job) {
+		p.Source = source
+	}
+}
+
+func WithTarget(target string) Option {
+	return func(p *internal.Job) {
+		p.Target = target
+	}
+}
+
+func WithEnabled(enabled bool) Option {
+	return func(p *internal.Job) {
+		p.Enabled = enabled
+	}
+}
+
+func WithExclusions(exclusions []string) Option {
+	return func(p *internal.Job) {
+		p.Exclusions = exclusions
+	}
+}
+
 // Execute captures the command and simulates execution.
 func (m *MockCommandExecutor) Execute(name string, args ...string) ([]byte, error) {
 	m.CapturedCommands = append(m.CapturedCommands, MockCommand{
@@ -49,12 +102,11 @@ func (m *MockCommandExecutor) Execute(name string, args ...string) ([]byte, erro
 
 func TestBuildRsyncCmd(t *testing.T) {
 	// This test doesn't need mocking since it only builds args
-	job := internal.Job{
-		Source:     "/home/user/Music/",
-		Target:     "/target/user/music/home",
-		Delete:     true,
-		Exclusions: []string{"*.tmp", "node_modules/"},
-	}
+	job := *NewJob(
+		WithSource("/home/user/Music/"),
+		WithTarget("/target/user/music/home"),
+		WithExclusions([]string{"*.tmp", "node_modules/"}),
+	)
 	args := internal.BuildRsyncCmd(job, true, "")
 
 	expectedArgs := []string{
@@ -72,46 +124,36 @@ func TestExecuteJob(t *testing.T) {
 	// Create mock executor
 	mockExecutor := &MockCommandExecutor{}
 
-	job := internal.Job{
-		Name:       "test_job",
-		Source:     "/home/test/",
-		Target:     "/mnt/backup1/test/",
-		Delete:     true,
-		Enabled:    true,
-		Exclusions: []string{"*.tmp"},
-	}
+	job := *NewJob(
+		WithName("test_job"),
+		WithSource("/home/test/"),
+		WithTarget("/mnt/backup1/test/"),
+		WithExclusions([]string{"*.tmp"}),
+	)
 	simulate := true
 
 	status := internal.ExecuteJobWithExecutor(job, simulate, false, "", mockExecutor)
-	if status != statusSuccess {
-		t.Errorf("Expected status SUCCESS, got %s", status)
-	}
+	expectStatus(t, status, statusSuccess)
 
-	disabledJob := internal.Job{
-		Name:    "disabled_job",
-		Source:  "/home/disabled/",
-		Target:  "/mnt/backup1/disabled/",
-		Enabled: false,
-	}
+	disabledJob := *NewJob(
+		WithName("disabled_job"),
+		WithSource("/home/disabled/"),
+		WithTarget("/mnt/backup1/disabled/"),
+		WithEnabled(false),
+	)
 
 	status = internal.ExecuteJobWithExecutor(disabledJob, simulate, false, "", mockExecutor)
-	if status != "SKIPPED" {
-		t.Errorf("Expected status SKIPPED, got %s", status)
-	}
+	expectStatus(t, status, "SKIPPED")
 
 	// Test case for failure (simulate by providing invalid source path)
-	invalidJob := internal.Job{
-		Name:    "invalid_job",
-		Source:  "/invalid/source/path",
-		Target:  "/mnt/backup1/invalid/",
-		Delete:  true,
-		Enabled: true,
-	}
+	invalidJob := *NewJob(
+		WithName("invalid_job"),
+		WithSource("/invalid/source/path"),
+		WithTarget("/mnt/backup1/invalid/"),
+	)
 
 	status = internal.ExecuteJobWithExecutor(invalidJob, false, false, "", mockExecutor)
-	if status != "FAILURE" {
-		t.Errorf("Expected status FAILURE, got %s", status)
-	}
+	expectStatus(t, status, "FAILURE")
 }
 
 // Ensure all references to ExecuteJob are prefixed with internal.
@@ -119,71 +161,58 @@ func TestJobSkippedEnabledTrue(t *testing.T) {
 	// Create mock executor
 	mockExecutor := &MockCommandExecutor{}
 
-	job := internal.Job{
-		Name:    "test_job",
-		Source:  "/home/test/",
-		Target:  "/mnt/backup1/test/",
-		Enabled: true,
-	}
+	job := *NewJob(
+		WithName("test_job"),
+		WithSource("/home/test/"),
+		WithTarget("/mnt/backup1/test/"),
+	)
 
 	status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
-	if status != statusSuccess {
-		t.Errorf("Expected status SUCCESS, got %s", status)
-	}
+	expectStatus(t, status, statusSuccess)
 }
 
 func TestJobSkippedEnabledFalse(t *testing.T) {
 	// Create mock executor (won't be used since job is disabled)
 	mockExecutor := &MockCommandExecutor{}
 
-	disabledJob := internal.Job{
-		Name:    "disabled_job",
-		Source:  "/home/disabled/",
-		Target:  "/mnt/backup1/disabled/",
-		Enabled: false,
-	}
+	disabledJob := *NewJob(
+		WithName("disabled_job"),
+		WithSource("/home/disabled/"),
+		WithTarget("/mnt/backup1/disabled/"),
+		WithEnabled(false),
+	)
 
 	status := internal.ExecuteJobWithExecutor(disabledJob, true, false, "", mockExecutor)
-	if status != "SKIPPED" {
-		t.Errorf("Expected status SKIPPED, got %s", status)
-	}
+	expectStatus(t, status, "SKIPPED")
 }
 
 func TestJobSkippedEnabledOmitted(t *testing.T) {
 	// Create mock executor
 	mockExecutor := &MockCommandExecutor{}
 
-	job := internal.Job{
-		Name:    "omitted_enabled_job",
-		Source:  "/home/omitted/",
-		Target:  "/mnt/backup1/omitted/",
-		Delete:  true,
-		Enabled: true,
-	}
+	job := *NewJob(
+		WithName("omitted_enabled_job"),
+		WithSource("/home/omitted/"),
+		WithTarget("/mnt/backup1/omitted/"),
+	)
 
 	status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
-	if status != statusSuccess {
-		t.Errorf("Expected status SUCCESS, got %s", status)
-	}
+	expectStatus(t, status, statusSuccess)
 }
 
 func TestExecuteJobWithMockedRsync(t *testing.T) {
 	// Create mock executor
 	mockExecutor := &MockCommandExecutor{}
 
-	job := internal.Job{
-		Name:       "test_job",
-		Source:     "/home/test/",
-		Target:     "/mnt/backup1/test/",
-		Delete:     true,
-		Enabled:    true,
-		Exclusions: []string{"*.tmp"},
-	}
+	job := *NewJob(
+		WithName("test_job"),
+		WithSource("/home/test/"),
+		WithTarget("/mnt/backup1/test/"),
+		WithExclusions([]string{"*.tmp"}),
+	)
 	status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
 
-	if status != statusSuccess {
-		t.Errorf("Expected status SUCCESS, got %s", status)
-	}
+	expectStatus(t, status, statusSuccess)
 
 	// Check that rsync was called with the expected arguments
 	if len(mockExecutor.CapturedCommands) == 0 {
@@ -199,5 +228,13 @@ func TestExecuteJobWithMockedRsync(t *testing.T) {
 
 	if len(cmd.Args) == 0 || cmd.Args[0] != "--dry-run" {
 		t.Errorf("Expected --dry-run flag, got %v", cmd.Args)
+	}
+}
+
+func expectStatus(t *testing.T, status, expectedStatus string) {
+	t.Helper()
+
+	if status != expectedStatus {
+		t.Errorf("Expected status %s, got %s", expectedStatus, status)
 	}
 }

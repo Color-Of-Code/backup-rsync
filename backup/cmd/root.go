@@ -20,13 +20,16 @@ func Execute() {
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "config.yaml", "Path to the configuration file")
 
 	// Parse flags before adding commands to ensure configPath is available.
-	rootCmd.ParseFlags(os.Args[1:])
+	err := rootCmd.ParseFlags(os.Args[1:])
+	if err != nil {
+		os.Exit(1)
+	}
 
 	AddConfigCommands(rootCmd, configPath)
 	AddBackupCommands(rootCmd, configPath)
 	AddCheckCommands(rootCmd, configPath)
 
-	err := rootCmd.Execute()
+	err = rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
 	}

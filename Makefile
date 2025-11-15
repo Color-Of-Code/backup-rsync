@@ -15,7 +15,7 @@ lint-config-check:
 	@golangci-lint config verify
 	@echo "OK: Lint configuration is valid."
 
-lint: lint-config-check
+lint:
 	golangci-lint run ./...
 
 lint-fix:
