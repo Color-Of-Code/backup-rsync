@@ -1,13 +1,15 @@
 {
   "name": "Go",
-  "image": "mcr.microsoft.com/devcontainers/go:2-1.24-bookworm",
+  "image": "mcr.microsoft.com/devcontainers/go:2-1.25-trixie",
   "features": {
     "ghcr.io/guiyomh/features/golangci-lint:0": {}
   },
   "customizations": {
     "vscode": {
       "extensions": [
-        "eamodio.gitlens"
+        "eamodio.gitlens",
+        "streetsidesoftware.code-spell-checker",
+        "esbenp.prettier-vscode"
       ]
     }
   }
