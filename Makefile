@@ -6,6 +6,16 @@ PACKAGE = ./backup/main.go
 
 .PHONY: build clean test lint tidy checksums release sanity-check check-mod-tidy
 
+format:
+	go fmt ./...
+	@echo "OK: Code formatted."
+
+lint:
+	golangci-lint run ./...
+
+lint-fix:
+	golangci-lint run --fix ./...
+
 check-clean:
 	@git diff --quiet || (echo "ERROR: Working directory has uncommitted changes." && exit 1)
 	@echo "OK: Working directory is clean."
@@ -14,11 +24,8 @@ check-mod-tidy:
 	go mod tidy -diff
 	@echo "OK: No untidy module files detected."
 
-sanity-check: check-clean check-mod-tidy
+sanity-check: format check-clean check-mod-tidy
 	@echo "OK: All sanity checks passed."
-
-lint:
-	golangci-lint run ./...
 
 test:
 	go test ./... -v

@@ -13,7 +13,8 @@ import (
 
 func LoadConfig(reader io.Reader) (Config, error) {
 	var cfg Config
-	if err := yaml.NewDecoder(reader).Decode(&cfg); err != nil {
+	err := yaml.NewDecoder(reader).Decode(&cfg)
+	if err != nil {
 		return Config{}, err
 	}
 
@@ -27,6 +28,7 @@ func substituteVariables(input string, variables map[string]string) string {
 		placeholder := fmt.Sprintf("${%s}", key)
 		input = strings.ReplaceAll(input, placeholder, value)
 	}
+
 	return input
 }
 
@@ -36,6 +38,7 @@ func resolveConfig(cfg Config) Config {
 		resolvedCfg.Jobs[i].Source = substituteVariables(job.Source, cfg.Variables)
 		resolvedCfg.Jobs[i].Target = substituteVariables(job.Target, cfg.Variables)
 	}
+
 	return resolvedCfg
 }
 
@@ -45,14 +48,15 @@ func validateJobNames(jobs []Job) error {
 
 	for _, job := range jobs {
 		if nameSet[job.Name] {
-			invalidNames = append(invalidNames, fmt.Sprintf("duplicate job name: %s", job.Name))
+			invalidNames = append(invalidNames, "duplicate job name: "+job.Name)
 		} else {
 			nameSet[job.Name] = true
 		}
 
 		for _, r := range job.Name {
 			if r > 127 || r == ' ' {
-				invalidNames = append(invalidNames, fmt.Sprintf("invalid characters in job name: %s", job.Name))
+				invalidNames = append(invalidNames, "invalid characters in job name: "+job.Name)
+
 				break
 			}
 		}
@@ -61,6 +65,7 @@ func validateJobNames(jobs []Job) error {
 	if len(invalidNames) > 0 {
 		return fmt.Errorf("job validation errors: %v", invalidNames)
 	}
+
 	return nil
 }
 
@@ -70,6 +75,7 @@ func validatePath(jobPath string, paths []Path, pathType string, jobName string)
 			return nil
 		}
 	}
+
 	return fmt.Errorf("invalid %s path for job '%s': %s", pathType, jobName, jobPath)
 }
 
@@ -77,17 +83,21 @@ func validatePaths(cfg Config) error {
 	invalidPaths := []string{}
 
 	for _, job := range cfg.Jobs {
-		if err := validatePath(job.Source, cfg.Sources, "source", job.Name); err != nil {
-			invalidPaths = append(invalidPaths, err.Error())
+		err1 := validatePath(job.Source, cfg.Sources, "source", job.Name)
+		if err1 != nil {
+			invalidPaths = append(invalidPaths, err1.Error())
 		}
-		if err := validatePath(job.Target, cfg.Targets, "target", job.Name); err != nil {
-			invalidPaths = append(invalidPaths, err.Error())
+		err2 := validatePath(job.Target, cfg.Targets, "target", job.Name)
+
+		if err2 != nil {
+			invalidPaths = append(invalidPaths, err2.Error())
 		}
 	}
 
 	if len(invalidPaths) > 0 {
 		return fmt.Errorf("path validation errors: %v", invalidPaths)
 	}
+
 	return nil
 }
 
@@ -99,12 +109,14 @@ func validateJobPaths(jobs []Job, pathType string, getPath func(job Job) string)
 
 				// Check if path2 is part of job1's exclusions
 				excluded := false
+
 				if pathType == "source" {
 					for _, exclusion := range job2.Exclusions {
 						exclusionPath := NormalizePath(filepath.Join(job2.Source, exclusion))
 						// log.Printf("job2: %s %s\n", job2.Name, exclusionPath)
 						if strings.HasPrefix(path1, exclusionPath) {
 							excluded = true
+
 							break
 						}
 					}
@@ -116,6 +128,7 @@ func validateJobPaths(jobs []Job, pathType string, getPath func(job Job) string)
 			}
 		}
 	}
+
 	return nil
 }
 

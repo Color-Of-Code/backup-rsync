@@ -6,14 +6,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// RootCmd represents the base command when called without any subcommands
+// RootCmd represents the base command when called without any subcommands.
 var RootCmd = &cobra.Command{
 	Use:   "backup-tool",
 	Short: "A tool for managing backups",
 	Long:  `backup-tool is a CLI tool for managing backups and configurations.`,
 }
 
-// Define a global configPath variable and flag at the root level
+// Define a global configPath variable and flag at the root level.
 var configPath string
 
 func init() {
@@ -22,7 +22,8 @@ func init() {
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
-	if err := RootCmd.Execute(); err != nil {
+	err := RootCmd.Execute()
+	if err != nil {
 		os.Exit(1)
 	}
 }

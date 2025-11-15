@@ -92,14 +92,17 @@ func runListUncoveredPathsTest(t *testing.T, fakeFS map[string][]string, cfg Con
 	if len(uncoveredPaths) != len(expectedUncoveredPaths) {
 		t.Errorf("Expected uncovered paths length %d, got %d. Expected: %v, Got: %v",
 			len(expectedUncoveredPaths), len(uncoveredPaths), expectedUncoveredPaths, uncoveredPaths)
+
 		return
 	}
 
 	for i, path := range uncoveredPaths {
 		if i >= len(expectedUncoveredPaths) {
 			t.Errorf("Got more uncovered paths than expected. Got: %v", uncoveredPaths)
+
 			return
 		}
+
 		if path != expectedUncoveredPaths[i] {
 			t.Errorf("Expected uncovered path '%s', got '%s'", expectedUncoveredPaths[i], path)
 		}

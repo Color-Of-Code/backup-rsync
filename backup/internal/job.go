@@ -13,16 +13,20 @@ func buildRsyncCmd(job Job, simulate bool, logPath string) []string {
 	if job.Delete {
 		args = append(args, "--delete")
 	}
+
 	if logPath != "" {
-		args = append(args, fmt.Sprintf("--log-file=%s", logPath))
+		args = append(args, "--log-file="+logPath)
 	}
+
 	for _, excl := range job.Exclusions {
-		args = append(args, fmt.Sprintf("--exclude=%s", excl))
+		args = append(args, "--exclude="+excl)
 	}
+
 	args = append(args, job.Source, job.Target)
 	if simulate {
 		args = append([]string{"--dry-run"}, args...)
 	}
+
 	return args
 }
 
@@ -42,8 +46,10 @@ func ExecuteJob(job Job, simulate bool, show bool, logPath string) string {
 	cmd := execCommand("rsync", args...)
 	out, err := cmd.CombinedOutput()
 	fmt.Printf("Output:\n%s\n", string(out))
+
 	if err != nil {
 		return "FAILURE"
 	}
+
 	return "SUCCESS"
 }

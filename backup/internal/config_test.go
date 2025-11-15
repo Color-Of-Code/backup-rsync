@@ -21,6 +21,7 @@ jobs:
     enabled: true
 `
 	reader := bytes.NewReader([]byte(yamlData))
+
 	cfg, err := LoadConfig(reader)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
@@ -38,9 +39,11 @@ jobs:
 	if job.Name != "test_job" {
 		t.Errorf("Expected job name test_job, got %s", job.Name)
 	}
+
 	if job.Source != "/home/test/" {
 		t.Errorf("Expected source /home/test/, got %s", job.Source)
 	}
+
 	if job.Target != "${target_base}/test/" {
 		t.Errorf("Expected target ${target_base}/test/, got %s", job.Target)
 	}
@@ -61,6 +64,7 @@ jobs:
 
 	// Use a reader instead of a mock file
 	reader := bytes.NewReader([]byte(yamlData))
+
 	cfg, err := LoadConfig(reader)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
@@ -147,10 +151,12 @@ delete: false
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var job Job
+
 			err := yaml.Unmarshal([]byte(tt.yamlData), &job)
 			if err != nil {
 				t.Fatalf("Failed to unmarshal YAML: %v", err)
 			}
+
 			if !reflect.DeepEqual(job, tt.expected) {
 				t.Errorf("got %+v, want %+v", job, tt.expected)
 			}
@@ -164,6 +170,7 @@ func TestSubstituteVariables(t *testing.T) {
 	}
 	input := "${target_base}/user/music/home"
 	expected := "/mnt/backup1/user/music/home"
+
 	result := substituteVariables(input, variables)
 	if result != expected {
 		t.Errorf("Expected %s, got %s", expected, result)

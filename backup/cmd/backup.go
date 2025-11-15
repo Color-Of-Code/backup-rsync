@@ -12,24 +12,28 @@ import (
 )
 
 func getLogPath(create bool) string {
-	logPath := fmt.Sprintf("logs/sync-%s", time.Now().Format("2006-01-02T15-04-05"))
+	logPath := "logs/sync-" + time.Now().Format("2006-01-02T15-04-05")
 	if create {
-		if err := os.MkdirAll(logPath, 0755); err != nil {
+		err := os.MkdirAll(logPath, 0755)
+		if err != nil {
 			log.Fatalf("Failed to create log directory: %v", err)
 		}
 	}
+
 	return logPath
 }
 
 func executeSyncJobs(cfg internal.Config, simulate bool) {
 	logPath := getLogPath(true)
 
-	overallLogPath := fmt.Sprintf("%s/summary.log", logPath)
+	overallLogPath := logPath + "/summary.log"
+
 	overallLogFile, err := os.OpenFile(overallLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		log.Fatalf("Failed to open overall log file: %v", err)
 	}
 	defer overallLogFile.Close()
+
 	overallLogger := log.New(overallLogFile, "", log.LstdFlags)
 
 	for _, job := range cfg.Jobs {

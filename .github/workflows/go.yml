@@ -16,6 +16,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Setup NodeJS
+      uses: actions/setup-node@v6
+      with:
+        node-version: 24.x
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
@@ -25,10 +30,9 @@ jobs:
       run: make sanity-check
 
     - name: Lint
-      uses: golangci/golangci-lint-action@v8
+      uses: golangci/golangci-lint-action@v9
       with:
-        version: latest
-        install-mode: goinstall
+        version: 'v2.5.0'
         args: --timeout=5m --verbose
 
     - name: Build

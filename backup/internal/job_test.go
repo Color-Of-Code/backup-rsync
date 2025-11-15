@@ -17,8 +17,10 @@ var mockExecCommand = func(name string, args ...string) *exec.Cmd {
 		if strings.Contains(strings.Join(args, " "), "/invalid/source/path") {
 			return exec.Command("false") // Simulate failure for invalid paths
 		}
+
 		return exec.Command("echo", "mocked rsync success") // Simulate general success
 	}
+
 	return exec.Command(name, args...)
 }
 
@@ -96,6 +98,7 @@ func TestJobSkippedEnabledTrue(t *testing.T) {
 		Target:  "/mnt/backup1/test/",
 		Enabled: true,
 	}
+
 	status := ExecuteJob(job, true, false, "")
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
@@ -109,6 +112,7 @@ func TestJobSkippedEnabledFalse(t *testing.T) {
 		Target:  "/mnt/backup1/disabled/",
 		Enabled: false,
 	}
+
 	status := ExecuteJob(disabledJob, true, false, "")
 	if status != "SKIPPED" {
 		t.Errorf("Expected status SKIPPED, got %s", status)
@@ -123,6 +127,7 @@ func TestJobSkippedEnabledOmitted(t *testing.T) {
 		Delete:  true,
 		Enabled: true,
 	}
+
 	status := ExecuteJob(job, true, false, "")
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)

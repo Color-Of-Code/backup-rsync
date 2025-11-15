@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// configCmd represents the config command
+// configCmd represents the config command.
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Manage configuration",
@@ -19,7 +19,7 @@ var configCmd = &cobra.Command{
 	},
 }
 
-// Extend the config subcommand with the show verb
+// Extend the config subcommand with the show verb.
 var showCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Show resolved configuration",
@@ -33,7 +33,7 @@ var showCmd = &cobra.Command{
 	},
 }
 
-// Extend the config subcommand with the validate verb
+// Extend the config subcommand with the validate verb.
 var validateCmd = &cobra.Command{
 	Use:   "validate",
 	Short: "Validate configuration",

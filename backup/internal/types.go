@@ -27,7 +27,7 @@ type Job struct {
 	Exclusions []string `yaml:"exclusions,omitempty"`
 }
 
-// JobYAML is a helper struct for proper YAML unmarshaling with defaults
+// JobYAML is a helper struct for proper YAML unmarshaling with defaults.
 type JobYAML struct {
 	Name       string   `yaml:"name"`
 	Source     string   `yaml:"source"`
@@ -37,10 +37,11 @@ type JobYAML struct {
 	Exclusions []string `yaml:"exclusions,omitempty"`
 }
 
-// UnmarshalYAML implements custom YAML unmarshaling to handle defaults properly
+// UnmarshalYAML implements custom YAML unmarshaling to handle defaults properly.
 func (j *Job) UnmarshalYAML(node *yaml.Node) error {
 	var jobYAML JobYAML
-	if err := node.Decode(&jobYAML); err != nil {
+	err := node.Decode(&jobYAML)
+	if err != nil {
 		return err
 	}
 
