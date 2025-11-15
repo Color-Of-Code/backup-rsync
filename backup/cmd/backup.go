@@ -55,35 +55,35 @@ func listCommands(cfg internal.Config) {
 	}
 }
 
-var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Execute the sync jobs",
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg := internal.LoadResolvedConfig(configPath)
-		executeSyncJobs(cfg, false)
-	},
-}
+func AddBackupCommands(rootCmd *cobra.Command, configPath string) {
+	var runCmd = &cobra.Command{
+		Use:   "run",
+		Short: "Execute the sync jobs",
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg := internal.LoadResolvedConfig(configPath)
+			executeSyncJobs(cfg, false)
+		},
+	}
 
-var simulateCmd = &cobra.Command{
-	Use:   "simulate",
-	Short: "Simulate the sync jobs",
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg := internal.LoadResolvedConfig(configPath)
-		executeSyncJobs(cfg, true)
-	},
-}
+	var simulateCmd = &cobra.Command{
+		Use:   "simulate",
+		Short: "Simulate the sync jobs",
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg := internal.LoadResolvedConfig(configPath)
+			executeSyncJobs(cfg, true)
+		},
+	}
 
-var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List the commands that will be executed",
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg := internal.LoadResolvedConfig(configPath)
-		listCommands(cfg)
-	},
-}
+	var listCmd = &cobra.Command{
+		Use:   "list",
+		Short: "List the commands that will be executed",
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg := internal.LoadResolvedConfig(configPath)
+			listCommands(cfg)
+		},
+	}
 
-func init() {
-	RootCmd.AddCommand(runCmd)
-	RootCmd.AddCommand(simulateCmd)
-	RootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(simulateCmd)
+	rootCmd.AddCommand(listCmd)
 }
