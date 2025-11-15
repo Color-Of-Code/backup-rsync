@@ -94,75 +94,84 @@ jobs:
 	}
 }
 
-func TestYAMLUnmarshalingDefaults(t *testing.T) {
-	tests := []struct {
-		name     string
-		yamlData string
-		expected internal.Job
-	}{
-		{
-			name: "Defaults applied when fields omitted",
-			yamlData: `
+func TestYAMLUnmarshalingDefaults_FieldsOmitted(t *testing.T) {
+	yamlData := `
 name: "test_job"
 source: "/source"
 target: "/target"
-`,
-			expected: internal.Job{
-				Name:    "test_job",
-				Source:  "/source",
-				Target:  "/target",
-				Delete:  true,
-				Enabled: true,
-			},
-		},
-		{
-			name: "Explicit false values preserved",
-			yamlData: `
+`
+	expected := internal.Job{
+		Name:    "test_job",
+		Source:  "/source",
+		Target:  "/target",
+		Delete:  true,
+		Enabled: true,
+	}
+
+	var job internal.Job
+
+	err := yaml.Unmarshal([]byte(yamlData), &job)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal YAML: %v", err)
+	}
+
+	if !reflect.DeepEqual(job, expected) {
+		t.Errorf("got %+v, want %+v", job, expected)
+	}
+}
+
+func TestYAMLUnmarshalingDefaults_ExplicitFalseValues(t *testing.T) {
+	yamlData := `
 name: "test_job"
 source: "/source"
 target: "/target"
 delete: false
 enabled: false
-`,
-			expected: internal.Job{
-				Name:    "test_job",
-				Source:  "/source",
-				Target:  "/target",
-				Delete:  false,
-				Enabled: false,
-			},
-		},
-		{
-			name: "Mixed explicit and default values",
-			yamlData: `
+`
+	expected := internal.Job{
+		Name:    "test_job",
+		Source:  "/source",
+		Target:  "/target",
+		Delete:  false,
+		Enabled: false,
+	}
+
+	var job internal.Job
+
+	err := yaml.Unmarshal([]byte(yamlData), &job)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal YAML: %v", err)
+	}
+
+	if !reflect.DeepEqual(job, expected) {
+		t.Errorf("got %+v, want %+v", job, expected)
+	}
+}
+
+func TestYAMLUnmarshalingDefaults_MixedValues(t *testing.T) {
+	yamlData := `
 name: "test_job"
 source: "/source"
 target: "/target"
 delete: false
-`,
-			expected: internal.Job{
-				Name:    "test_job",
-				Source:  "/source",
-				Target:  "/target",
-				Delete:  false,
-				Enabled: true, // default
-			},
-		},
+`
+	expected := internal.Job{
+		Name:    "test_job",
+		Source:  "/source",
+		Target:  "/target",
+		Delete:  false,
+		Enabled: true, // default
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var job internal.Job
+	var job internal.Job
 
-			err := yaml.Unmarshal([]byte(tt.yamlData), &job)
-			if err != nil {
-				t.Fatalf("Failed to unmarshal YAML: %v", err)
-			}
+	err := yaml.Unmarshal([]byte(yamlData), &job)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal YAML: %v", err)
+	}
 
-			if !reflect.DeepEqual(job, tt.expected) {
-				t.Errorf("got %+v, want %+v", job, tt.expected)
-			}
-		})
+	if !reflect.DeepEqual(job, expected) {
+		t.Errorf("got %+v, want %+v", job, expected)
 	}
 }
 
@@ -233,76 +242,100 @@ func TestValidateJobNames(t *testing.T) {
 					t.Errorf("Expected error message to contain '%s', but got '%s'", test.errorMessage, err.Error())
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Expected no error but got: %v", err)
-				}
+				expectNoError(t, err)
 			}
 		})
 	}
 }
 
-func TestValidatePath(t *testing.T) {
-	tests := []struct {
-		name         string
+func expectNoError(t *testing.T, err error) {
+	t.Helper()
+
+	if err != nil {
+		t.Errorf("Expected no error but got: %v", err)
+	}
+}
+
+func expectError(t *testing.T, err error, expectedMessage string) {
+	t.Helper()
+
+	if err == nil {
+		t.Errorf("Expected error but got none")
+	} else if err.Error() != expectedMessage {
+		t.Errorf("Expected error message '%s', but got '%s'", expectedMessage, err.Error())
+	}
+}
+
+func TestValidatePath_ValidSourcePath(t *testing.T) {
+	test := struct {
+		jobPath  string
+		paths    []internal.Path
+		pathType string
+		jobName  string
+	}{
+		jobPath:  "/home/user/documents",
+		paths:    []internal.Path{{Path: "/home/user"}},
+		pathType: "source",
+		jobName:  "job1",
+	}
+
+	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, test.jobName)
+	expectNoError(t, err)
+}
+
+func TestValidatePath_InvalidSourcePath(t *testing.T) {
+	test := struct {
 		jobPath      string
 		paths        []internal.Path
 		pathType     string
 		jobName      string
-		expectsError bool
 		errorMessage string
 	}{
-		{
-			name:         "Valid source path",
-			jobPath:      "/home/user/documents",
-			paths:        []internal.Path{{Path: "/home/user"}},
-			pathType:     "source",
-			jobName:      "job1",
-			expectsError: false,
-		},
-		{
-			name:         "Invalid source path",
-			jobPath:      "/invalid/source",
-			paths:        []internal.Path{{Path: "/home/user"}},
-			pathType:     "source",
-			jobName:      "job1",
-			expectsError: true,
-			errorMessage: "invalid source path for job 'job1': /invalid/source",
-		},
-		{
-			name:         "Valid target path",
-			jobPath:      "/mnt/backup/documents",
-			paths:        []internal.Path{{Path: "/mnt/backup"}},
-			pathType:     "target",
-			jobName:      "job1",
-			expectsError: false,
-		},
-		{
-			name:         "Invalid target path",
-			jobPath:      "/invalid/target",
-			paths:        []internal.Path{{Path: "/mnt/backup"}},
-			pathType:     "target",
-			jobName:      "job1",
-			expectsError: true,
-			errorMessage: "invalid target path for job 'job1': /invalid/target",
-		},
+		jobPath:      "/invalid/source",
+		paths:        []internal.Path{{Path: "/home/user"}},
+		pathType:     "source",
+		jobName:      "job1",
+		errorMessage: "invalid source path for job 'job1': /invalid/source",
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, test.jobName)
-			if test.expectsError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if err.Error() != test.errorMessage {
-					t.Errorf("Expected error message '%s', but got '%s'", test.errorMessage, err.Error())
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Expected no error but got: %v", err)
-				}
-			}
-		})
+	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, test.jobName)
+	expectError(t, err, test.errorMessage)
+}
+
+func TestValidatePath_ValidTargetPath(t *testing.T) {
+	test := struct {
+		jobPath  string
+		paths    []internal.Path
+		pathType string
+		jobName  string
+	}{
+		jobPath:  "/mnt/backup/documents",
+		paths:    []internal.Path{{Path: "/mnt/backup"}},
+		pathType: "target",
+		jobName:  "job1",
 	}
+
+	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, test.jobName)
+	expectNoError(t, err)
+}
+
+func TestValidatePath_InvalidTargetPath(t *testing.T) {
+	test := struct {
+		jobPath      string
+		paths        []internal.Path
+		pathType     string
+		jobName      string
+		errorMessage string
+	}{
+		jobPath:      "/invalid/target",
+		paths:        []internal.Path{{Path: "/mnt/backup"}},
+		pathType:     "target",
+		jobName:      "job1",
+		errorMessage: "invalid target path for job 'job1': /invalid/target",
+	}
+
+	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, test.jobName)
+	expectError(t, err, test.errorMessage)
 }
 
 func TestValidatePaths(t *testing.T) {
@@ -351,15 +384,9 @@ func TestValidatePaths(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := internal.ValidatePaths(test.cfg)
 			if test.expectsError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if err.Error() != test.errorMessage {
-					t.Errorf("Expected error message '%s', but got '%s'", test.errorMessage, err.Error())
-				}
+				expectError(t, err, test.errorMessage)
 			} else {
-				if err != nil {
-					t.Errorf("Expected no error but got: %v", err)
-				}
+				expectNoError(t, err)
 			}
 		})
 	}

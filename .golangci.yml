@@ -10,7 +10,6 @@ linters:
     - err113
     - errcheck
     - forbidigo
-    - funlen
     - gocritic
     - godoclint
     - gosec

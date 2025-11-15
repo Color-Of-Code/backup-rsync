@@ -115,8 +115,8 @@ func runListUncoveredPathsTest(
 	}
 }
 
-func TestListUncoveredPathsVariations(t *testing.T) {
-	// Variation: all paths used
+// Variation: all paths used.
+func TestListUncoveredPathsVariationsAllCovered(t *testing.T) {
 	runListUncoveredPathsTest(t,
 		map[string][]string{
 			"/var/log": {"app1", "app2"},
@@ -134,8 +134,10 @@ func TestListUncoveredPathsVariations(t *testing.T) {
 		},
 		[]string{},
 	)
+}
 
-	// Variation: one source covered, one uncovered
+// Variation: one source covered, one uncovered.
+func TestListUncoveredPathsVariationsOneCoveredOneUncovered(t *testing.T) {
 	runListUncoveredPathsTest(t,
 		map[string][]string{
 			"/home/data":       {"projects", "media"},
@@ -154,8 +156,10 @@ func TestListUncoveredPathsVariations(t *testing.T) {
 		},
 		[]string{"/home/user"},
 	)
+}
 
-	// Variation: one source covered, one uncovered but excluded
+// Variation: one source covered, one uncovered but excluded.
+func TestListUncoveredPathsVariationsUncoveredExcluded(t *testing.T) {
 	runListUncoveredPathsTest(t,
 		map[string][]string{
 			"/home/data": {"projects", "media"},
@@ -170,8 +174,10 @@ func TestListUncoveredPathsVariations(t *testing.T) {
 		},
 		[]string{},
 	)
+}
 
-	// Variation: one source covered, subfolders covered
+// Variation: one source covered, subfolders covered.
+func TestListUncoveredPathsVariationsSubfoldersCovered(t *testing.T) {
 	runListUncoveredPathsTest(t,
 		map[string][]string{
 			"/home/data":            {"family"},
@@ -190,7 +196,10 @@ func TestListUncoveredPathsVariations(t *testing.T) {
 		},
 		[]string{},
 	)
+}
 
+func TestListUncoveredPathsVariationsSubfoldersPartiallyCovered(t *testing.T) {
+	t.Skip("Skipping test for partially covered subfolders")
 	// // Variation: one source covered, one uncovered subfolder
 	// runListUncoveredPathsTest(t,
 	// 	map[string][]string{
