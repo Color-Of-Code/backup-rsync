@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-var execCommand = exec.Command
+var ExecCommand = exec.Command
 
-func buildRsyncCmd(job Job, simulate bool, logPath string) []string {
+func BuildRsyncCmd(job Job, simulate bool, logPath string) []string {
 	args := []string{"-aiv", "--stats"}
 	if job.Delete {
 		args = append(args, "--delete")
@@ -35,7 +35,7 @@ func ExecuteJob(job Job, simulate bool, show bool, logPath string) string {
 		return "SKIPPED"
 	}
 
-	args := buildRsyncCmd(job, simulate, logPath)
+	args := BuildRsyncCmd(job, simulate, logPath)
 	fmt.Printf("Job: %s\n", job.Name)
 	fmt.Printf("Command: rsync %s\n", strings.Join(args, " "))
 
@@ -43,7 +43,7 @@ func ExecuteJob(job Job, simulate bool, show bool, logPath string) string {
 		return "SUCCESS"
 	}
 
-	cmd := execCommand("rsync", args...)
+	cmd := ExecCommand("rsync", args...)
 	out, err := cmd.CombinedOutput()
 	fmt.Printf("Output:\n%s\n", string(out))
 

@@ -40,6 +40,7 @@ type JobYAML struct {
 // UnmarshalYAML implements custom YAML unmarshaling to handle defaults properly.
 func (j *Job) UnmarshalYAML(node *yaml.Node) error {
 	var jobYAML JobYAML
+
 	err := node.Decode(&jobYAML)
 	if err != nil {
 		return err

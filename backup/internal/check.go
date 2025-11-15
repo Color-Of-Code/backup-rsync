@@ -20,7 +20,7 @@ func isExcluded(path string, job Job) bool {
 	return false
 }
 
-func isExcludedGlobally(path string, sources []Path) bool {
+func IsExcludedGlobally(path string, sources []Path) bool {
 	for _, source := range sources {
 		for _, exclusion := range source.Exclusions {
 			exclusionPath := filepath.Join(source.Path, exclusion)
@@ -85,7 +85,7 @@ func checkPath(fs afero.Fs, path string, cfg Config, result *[]string, seen map[
 	seen[path] = true
 
 	// Skip if globally excluded
-	if isExcludedGlobally(path, cfg.Sources) {
+	if IsExcludedGlobally(path, cfg.Sources) {
 		log.Printf("SKIP: Path '%s' is globally excluded", path)
 
 		return
@@ -128,7 +128,7 @@ func isEffectivelyCovered(fs afero.Fs, path string, cfg Config) bool {
 	allCovered := true
 
 	for _, child := range children {
-		if !isExcludedGlobally(child, cfg.Sources) && !isCovered(child, cfg.Jobs) && !isEffectivelyCovered(fs, child, cfg) {
+		if !IsExcludedGlobally(child, cfg.Sources) && !isCovered(child, cfg.Jobs) && !isEffectivelyCovered(fs, child, cfg) {
 			log.Printf("UNCOVERED CHILD: Path '%s' has uncovered child '%s'", path, child)
 
 			allCovered = false

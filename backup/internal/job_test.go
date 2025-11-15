@@ -1,9 +1,11 @@
-package internal
+package internal_test
 
 import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"backup-rsync/backup/internal"
 )
 
 var capturedArgs []string
@@ -25,17 +27,17 @@ var mockExecCommand = func(name string, args ...string) *exec.Cmd {
 }
 
 func init() {
-	execCommand = mockExecCommand
+	internal.ExecCommand = mockExecCommand
 }
 
 func TestBuildRsyncCmd(t *testing.T) {
-	job := Job{
+	job := internal.Job{
 		Source:     "/home/user/Music/",
 		Target:     "/target/user/music/home",
 		Delete:     true,
 		Exclusions: []string{"*.tmp", "node_modules/"},
 	}
-	args := buildRsyncCmd(job, true, "")
+	args := internal.BuildRsyncCmd(job, true, "")
 
 	expectedArgs := []string{
 		"--dry-run", "-aiv", "--stats", "--delete",
@@ -49,7 +51,7 @@ func TestBuildRsyncCmd(t *testing.T) {
 }
 
 func TestExecuteJob(t *testing.T) {
-	job := Job{
+	job := internal.Job{
 		Name:       "test_job",
 		Source:     "/home/test/",
 		Target:     "/mnt/backup1/test/",
@@ -59,25 +61,25 @@ func TestExecuteJob(t *testing.T) {
 	}
 	simulate := true
 
-	status := ExecuteJob(job, simulate, false, "")
+	status := internal.ExecuteJob(job, simulate, false, "")
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
 
-	disabledJob := Job{
+	disabledJob := internal.Job{
 		Name:    "disabled_job",
 		Source:  "/home/disabled/",
 		Target:  "/mnt/backup1/disabled/",
 		Enabled: false,
 	}
 
-	status = ExecuteJob(disabledJob, simulate, false, "")
+	status = internal.ExecuteJob(disabledJob, simulate, false, "")
 	if status != "SKIPPED" {
 		t.Errorf("Expected status SKIPPED, got %s", status)
 	}
 
 	// Test case for failure (simulate by providing invalid source path)
-	invalidJob := Job{
+	invalidJob := internal.Job{
 		Name:    "invalid_job",
 		Source:  "/invalid/source/path",
 		Target:  "/mnt/backup1/invalid/",
@@ -85,42 +87,43 @@ func TestExecuteJob(t *testing.T) {
 		Enabled: true,
 	}
 
-	status = ExecuteJob(invalidJob, false, false, "")
+	status = internal.ExecuteJob(invalidJob, false, false, "")
 	if status != "FAILURE" {
 		t.Errorf("Expected status FAILURE, got %s", status)
 	}
 }
 
+// Ensure all references to ExecuteJob are prefixed with internal
 func TestJobSkippedEnabledTrue(t *testing.T) {
-	job := Job{
+	job := internal.Job{
 		Name:    "test_job",
 		Source:  "/home/test/",
 		Target:  "/mnt/backup1/test/",
 		Enabled: true,
 	}
 
-	status := ExecuteJob(job, true, false, "")
+	status := internal.ExecuteJob(job, true, false, "")
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
 }
 
 func TestJobSkippedEnabledFalse(t *testing.T) {
-	disabledJob := Job{
+	disabledJob := internal.Job{
 		Name:    "disabled_job",
 		Source:  "/home/disabled/",
 		Target:  "/mnt/backup1/disabled/",
 		Enabled: false,
 	}
 
-	status := ExecuteJob(disabledJob, true, false, "")
+	status := internal.ExecuteJob(disabledJob, true, false, "")
 	if status != "SKIPPED" {
 		t.Errorf("Expected status SKIPPED, got %s", status)
 	}
 }
 
 func TestJobSkippedEnabledOmitted(t *testing.T) {
-	job := Job{
+	job := internal.Job{
 		Name:    "omitted_enabled_job",
 		Source:  "/home/omitted/",
 		Target:  "/mnt/backup1/omitted/",
@@ -128,7 +131,7 @@ func TestJobSkippedEnabledOmitted(t *testing.T) {
 		Enabled: true,
 	}
 
-	status := ExecuteJob(job, true, false, "")
+	status := internal.ExecuteJob(job, true, false, "")
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
@@ -138,7 +141,7 @@ func TestExecuteJobWithMockedRsync(t *testing.T) {
 	// Reset capturedArgs before the test
 	capturedArgs = nil
 
-	job := Job{
+	job := internal.Job{
 		Name:       "test_job",
 		Source:     "/home/test/",
 		Target:     "/mnt/backup1/test/",
@@ -146,7 +149,7 @@ func TestExecuteJobWithMockedRsync(t *testing.T) {
 		Enabled:    true,
 		Exclusions: []string{"*.tmp"},
 	}
-	status := ExecuteJob(job, true, false, "")
+	status := internal.ExecuteJob(job, true, false, "")
 
 	if status != "SUCCESS" {
 		t.Errorf("Expected status SUCCESS, got %s", status)

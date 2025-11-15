@@ -13,6 +13,7 @@ import (
 
 func LoadConfig(reader io.Reader) (Config, error) {
 	var cfg Config
+
 	err := yaml.NewDecoder(reader).Decode(&cfg)
 	if err != nil {
 		return Config{}, err
@@ -23,7 +24,7 @@ func LoadConfig(reader io.Reader) (Config, error) {
 	return cfg, nil
 }
 
-func substituteVariables(input string, variables map[string]string) string {
+func SubstituteVariables(input string, variables map[string]string) string {
 	for key, value := range variables {
 		placeholder := fmt.Sprintf("${%s}", key)
 		input = strings.ReplaceAll(input, placeholder, value)
@@ -35,14 +36,14 @@ func substituteVariables(input string, variables map[string]string) string {
 func resolveConfig(cfg Config) Config {
 	resolvedCfg := cfg
 	for i, job := range resolvedCfg.Jobs {
-		resolvedCfg.Jobs[i].Source = substituteVariables(job.Source, cfg.Variables)
-		resolvedCfg.Jobs[i].Target = substituteVariables(job.Target, cfg.Variables)
+		resolvedCfg.Jobs[i].Source = SubstituteVariables(job.Source, cfg.Variables)
+		resolvedCfg.Jobs[i].Target = SubstituteVariables(job.Target, cfg.Variables)
 	}
 
 	return resolvedCfg
 }
 
-func validateJobNames(jobs []Job) error {
+func ValidateJobNames(jobs []Job) error {
 	invalidNames := []string{}
 	nameSet := make(map[string]bool)
 
@@ -69,7 +70,7 @@ func validateJobNames(jobs []Job) error {
 	return nil
 }
 
-func validatePath(jobPath string, paths []Path, pathType string, jobName string) error {
+func ValidatePath(jobPath string, paths []Path, pathType string, jobName string) error {
 	for _, path := range paths {
 		if strings.HasPrefix(jobPath, path.Path) {
 			return nil
@@ -79,16 +80,16 @@ func validatePath(jobPath string, paths []Path, pathType string, jobName string)
 	return fmt.Errorf("invalid %s path for job '%s': %s", pathType, jobName, jobPath)
 }
 
-func validatePaths(cfg Config) error {
+func ValidatePaths(cfg Config) error {
 	invalidPaths := []string{}
 
 	for _, job := range cfg.Jobs {
-		err1 := validatePath(job.Source, cfg.Sources, "source", job.Name)
+		err1 := ValidatePath(job.Source, cfg.Sources, "source", job.Name)
 		if err1 != nil {
 			invalidPaths = append(invalidPaths, err1.Error())
 		}
-		err2 := validatePath(job.Target, cfg.Targets, "target", job.Name)
 
+		err2 := ValidatePath(job.Target, cfg.Targets, "target", job.Name)
 		if err2 != nil {
 			invalidPaths = append(invalidPaths, err2.Error())
 		}
@@ -144,13 +145,13 @@ func LoadResolvedConfig(configPath string) Config {
 		log.Fatalf("Failed to parse YAML: %v", err)
 	}
 
-	if err := validateJobNames(cfg.Jobs); err != nil {
+	if err := ValidateJobNames(cfg.Jobs); err != nil {
 		log.Fatalf("Job validation failed: %v", err)
 	}
 
 	resolvedCfg := resolveConfig(cfg)
 
-	if err := validatePaths(resolvedCfg); err != nil {
+	if err := ValidatePaths(resolvedCfg); err != nil {
 		log.Fatalf("Path validation failed: %v", err)
 	}
 

@@ -1,20 +1,20 @@
-package internal
+package internal_test
 
 import (
 	"bytes"
 	"log"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
-	"time"
+
+	"backup-rsync/backup/internal"
 
 	"github.com/spf13/afero"
 )
 
 func TestIsExcludedGlobally(t *testing.T) {
-	sources := []Path{
+	sources := []internal.Path{
 		{
 			Path:       "/home/data/",
 			Exclusions: []string{"/projects/P1/", "/media/"},
@@ -55,7 +55,7 @@ func TestIsExcludedGlobally(t *testing.T) {
 			var logBuffer bytes.Buffer
 			log.SetOutput(&logBuffer)
 
-			result := isExcludedGlobally(test.path, sources)
+			result := internal.IsExcludedGlobally(test.path, sources)
 			if result != test.expectsError {
 				t.Errorf("Expected exclusion result %v, got %v", test.expectsError, result)
 			}
@@ -69,7 +69,7 @@ func TestIsExcludedGlobally(t *testing.T) {
 	}
 }
 
-func runListUncoveredPathsTest(t *testing.T, fakeFS map[string][]string, cfg Config, expectedUncoveredPaths []string) {
+func runListUncoveredPathsTest(t *testing.T, fakeFS map[string][]string, cfg internal.Config, expectedUncoveredPaths []string) {
 	// Create an in-memory filesystem using Afero
 	fs := afero.NewMemMapFs()
 
@@ -83,7 +83,7 @@ func runListUncoveredPathsTest(t *testing.T, fakeFS map[string][]string, cfg Con
 	}
 
 	// Call the function
-	uncoveredPaths := ListUncoveredPaths(fs, cfg)
+	uncoveredPaths := internal.ListUncoveredPaths(fs, cfg)
 
 	// Assertions
 	sort.Strings(uncoveredPaths)
@@ -116,12 +116,12 @@ func TestListUncoveredPathsVariations(t *testing.T) {
 			"/var/log": {"app1", "app2"},
 			"/tmp":     {"cache", "temp"},
 		},
-		Config{
-			Sources: []Path{
+		internal.Config{
+			Sources: []internal.Path{
 				{Path: "/var/log"},
 				{Path: "/tmp"},
 			},
-			Jobs: []Job{
+			Jobs: []internal.Job{
 				{Name: "Job1", Source: "/var/log"},
 				{Name: "Job2", Source: "/tmp"},
 			},
@@ -137,12 +137,12 @@ func TestListUncoveredPathsVariations(t *testing.T) {
 			"/home/user/cache": {},
 			"/home/user/npm":   {},
 		},
-		Config{
-			Sources: []Path{
+		internal.Config{
+			Sources: []internal.Path{
 				{Path: "/home/data"},
 				{Path: "/home/user"},
 			},
-			Jobs: []Job{
+			Jobs: []internal.Job{
 				{Name: "Job1", Source: "/home/data"},
 			},
 		},
@@ -154,11 +154,11 @@ func TestListUncoveredPathsVariations(t *testing.T) {
 		map[string][]string{
 			"/home/data": {"projects", "media"},
 		},
-		Config{
-			Sources: []Path{
+		internal.Config{
+			Sources: []internal.Path{
 				{Path: "/home/data", Exclusions: []string{"media"}},
 			},
-			Jobs: []Job{
+			Jobs: []internal.Job{
 				{Name: "Job1", Source: "/home/data/projects"},
 			},
 		},
@@ -173,11 +173,11 @@ func TestListUncoveredPathsVariations(t *testing.T) {
 			"/home/data/family/me":  {"a"},
 			"/home/data/family/you": {"a"},
 		},
-		Config{
-			Sources: []Path{
+		internal.Config{
+			Sources: []internal.Path{
 				{Path: "/home/data"},
 			},
-			Jobs: []Job{
+			Jobs: []internal.Job{
 				{Name: "JobMe", Source: "/home/data/family/me"},
 				{Name: "JobYou", Source: "/home/data/family/you"},
 			},
@@ -204,25 +204,3 @@ func TestListUncoveredPathsVariations(t *testing.T) {
 	// 	[]string{"/home/data/family/you"},
 	// )
 }
-
-type mockDirEntry struct {
-	name  string
-	isDir bool
-}
-
-func (m mockDirEntry) Name() string               { return m.name }
-func (m mockDirEntry) IsDir() bool                { return m.isDir }
-func (m mockDirEntry) Type() os.FileMode          { return 0 }
-func (m mockDirEntry) Info() (os.FileInfo, error) { return nil, nil }
-
-type mockFileInfo struct {
-	name  string
-	isDir bool
-}
-
-func (m mockFileInfo) Name() string       { return m.name }
-func (m mockFileInfo) Size() int64        { return 0 }
-func (m mockFileInfo) Mode() os.FileMode  { return 0 }
-func (m mockFileInfo) ModTime() time.Time { return time.Time{} }
-func (m mockFileInfo) IsDir() bool        { return m.isDir }
-func (m mockFileInfo) Sys() interface{}   { return nil }

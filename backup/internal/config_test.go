@@ -1,4 +1,4 @@
-package internal
+package internal_test
 
 import (
 	"bytes"
@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"gopkg.in/yaml.v3"
+
+	"backup-rsync/backup/internal"
 )
 
 func TestLoadConfig1(t *testing.T) {
@@ -22,7 +24,7 @@ jobs:
 `
 	reader := bytes.NewReader([]byte(yamlData))
 
-	cfg, err := LoadConfig(reader)
+	cfg, err := internal.LoadConfig(reader)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -65,12 +67,12 @@ jobs:
 	// Use a reader instead of a mock file
 	reader := bytes.NewReader([]byte(yamlData))
 
-	cfg, err := LoadConfig(reader)
+	cfg, err := internal.LoadConfig(reader)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	expected := []Job{
+	expected := []internal.Job{
 		{
 			Name:    "job1",
 			Source:  "/source1",
@@ -96,7 +98,7 @@ func TestYAMLUnmarshalingDefaults(t *testing.T) {
 	tests := []struct {
 		name     string
 		yamlData string
-		expected Job
+		expected internal.Job
 	}{
 		{
 			name: "Defaults applied when fields omitted",
@@ -105,7 +107,7 @@ name: "test_job"
 source: "/source"
 target: "/target"
 `,
-			expected: Job{
+			expected: internal.Job{
 				Name:    "test_job",
 				Source:  "/source",
 				Target:  "/target",
@@ -122,7 +124,7 @@ target: "/target"
 delete: false
 enabled: false
 `,
-			expected: Job{
+			expected: internal.Job{
 				Name:    "test_job",
 				Source:  "/source",
 				Target:  "/target",
@@ -138,7 +140,7 @@ source: "/source"
 target: "/target"
 delete: false
 `,
-			expected: Job{
+			expected: internal.Job{
 				Name:    "test_job",
 				Source:  "/source",
 				Target:  "/target",
@@ -150,7 +152,7 @@ delete: false
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var job Job
+			var job internal.Job
 
 			err := yaml.Unmarshal([]byte(tt.yamlData), &job)
 			if err != nil {
@@ -171,7 +173,7 @@ func TestSubstituteVariables(t *testing.T) {
 	input := "${target_base}/user/music/home"
 	expected := "/mnt/backup1/user/music/home"
 
-	result := substituteVariables(input, variables)
+	result := internal.SubstituteVariables(input, variables)
 	if result != expected {
 		t.Errorf("Expected %s, got %s", expected, result)
 	}
@@ -180,13 +182,13 @@ func TestSubstituteVariables(t *testing.T) {
 func TestValidateJobNames(t *testing.T) {
 	tests := []struct {
 		name         string
-		jobs         []Job
+		jobs         []internal.Job
 		expectsError bool
 		errorMessage string
 	}{
 		{
 			name: "Valid job names",
-			jobs: []Job{
+			jobs: []internal.Job{
 				{Name: "job1"},
 				{Name: "job2"},
 			},
@@ -194,7 +196,7 @@ func TestValidateJobNames(t *testing.T) {
 		},
 		{
 			name: "Duplicate job names",
-			jobs: []Job{
+			jobs: []internal.Job{
 				{Name: "job1"},
 				{Name: "job1"},
 			},
@@ -203,7 +205,7 @@ func TestValidateJobNames(t *testing.T) {
 		},
 		{
 			name: "Invalid characters in job name",
-			jobs: []Job{
+			jobs: []internal.Job{
 				{Name: "job 1"},
 			},
 			expectsError: true,
@@ -211,7 +213,7 @@ func TestValidateJobNames(t *testing.T) {
 		},
 		{
 			name: "Mixed errors",
-			jobs: []Job{
+			jobs: []internal.Job{
 				{Name: "job1"},
 				{Name: "job 1"},
 				{Name: "job1"},
@@ -223,7 +225,7 @@ func TestValidateJobNames(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := validateJobNames(test.jobs)
+			err := internal.ValidateJobNames(test.jobs)
 			if test.expectsError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -243,7 +245,7 @@ func TestValidatePath(t *testing.T) {
 	tests := []struct {
 		name         string
 		jobPath      string
-		paths        []Path
+		paths        []internal.Path
 		pathType     string
 		jobName      string
 		expectsError bool
@@ -252,7 +254,7 @@ func TestValidatePath(t *testing.T) {
 		{
 			name:         "Valid source path",
 			jobPath:      "/home/user/documents",
-			paths:        []Path{{Path: "/home/user"}},
+			paths:        []internal.Path{{Path: "/home/user"}},
 			pathType:     "source",
 			jobName:      "job1",
 			expectsError: false,
@@ -260,7 +262,7 @@ func TestValidatePath(t *testing.T) {
 		{
 			name:         "Invalid source path",
 			jobPath:      "/invalid/source",
-			paths:        []Path{{Path: "/home/user"}},
+			paths:        []internal.Path{{Path: "/home/user"}},
 			pathType:     "source",
 			jobName:      "job1",
 			expectsError: true,
@@ -269,7 +271,7 @@ func TestValidatePath(t *testing.T) {
 		{
 			name:         "Valid target path",
 			jobPath:      "/mnt/backup/documents",
-			paths:        []Path{{Path: "/mnt/backup"}},
+			paths:        []internal.Path{{Path: "/mnt/backup"}},
 			pathType:     "target",
 			jobName:      "job1",
 			expectsError: false,
@@ -277,7 +279,7 @@ func TestValidatePath(t *testing.T) {
 		{
 			name:         "Invalid target path",
 			jobPath:      "/invalid/target",
-			paths:        []Path{{Path: "/mnt/backup"}},
+			paths:        []internal.Path{{Path: "/mnt/backup"}},
 			pathType:     "target",
 			jobName:      "job1",
 			expectsError: true,
@@ -287,7 +289,7 @@ func TestValidatePath(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := validatePath(test.jobPath, test.paths, test.pathType, test.jobName)
+			err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, test.jobName)
 			if test.expectsError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -306,20 +308,20 @@ func TestValidatePath(t *testing.T) {
 func TestValidatePaths(t *testing.T) {
 	tests := []struct {
 		name         string
-		cfg          Config
+		cfg          internal.Config
 		expectsError bool
 		errorMessage string
 	}{
 		{
 			name: "Valid paths",
-			cfg: Config{
-				Sources: []Path{
+			cfg: internal.Config{
+				Sources: []internal.Path{
 					{Path: "/home/user"},
 				},
-				Targets: []Path{
+				Targets: []internal.Path{
 					{Path: "/mnt/backup"},
 				},
-				Jobs: []Job{
+				Jobs: []internal.Job{
 					{Name: "job1", Source: "/home/user/documents", Target: "/mnt/backup/documents"},
 				},
 			},
@@ -327,14 +329,14 @@ func TestValidatePaths(t *testing.T) {
 		},
 		{
 			name: "Invalid paths",
-			cfg: Config{
-				Sources: []Path{
+			cfg: internal.Config{
+				Sources: []internal.Path{
 					{Path: "/home/user"},
 				},
-				Targets: []Path{
+				Targets: []internal.Path{
 					{Path: "/mnt/backup"},
 				},
-				Jobs: []Job{
+				Jobs: []internal.Job{
 					{Name: "job1", Source: "/invalid/source", Target: "/invalid/target"},
 				},
 			},
@@ -345,7 +347,7 @@ func TestValidatePaths(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := validatePaths(test.cfg)
+			err := internal.ValidatePaths(test.cfg)
 			if test.expectsError {
 				if err == nil {
 					t.Errorf("Expected error but got none")

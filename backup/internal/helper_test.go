@@ -1,6 +1,9 @@
-package internal
+package internal_test
 
-import "testing"
+import (
+	"backup-rsync/backup/internal"
+	"testing"
+)
 
 func TestNormalizePath(t *testing.T) {
 	tests := []struct {
@@ -14,7 +17,7 @@ func TestNormalizePath(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := NormalizePath(test.input)
+		result := internal.NormalizePath(test.input)
 		if result != test.expected {
 			t.Errorf("NormalizePath(%q) = %q; want %q", test.input, result, test.expected)
 		}
