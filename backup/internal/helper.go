@@ -1,4 +1,4 @@
-// Correct the package declaration
+// Package internal provides helper functions for internal use within the application.
 package internal
 
 import "strings"

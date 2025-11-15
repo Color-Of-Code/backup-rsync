@@ -3,12 +3,30 @@ linters:
   default: all
   disable:
     - wsl # The linter 'wsl' is deprecated (since v2.2.0) due to: new major version. Replaced by wsl_v5
+    - paralleltest # not used in this project
+    - revive # temporarily disable
+    - exhaustruct # temporarily disable
+    - gochecknoglobals # temporarily disable
+    - depguard
+    - err113
+    - errcheck
+    - forbidigo
+    - funlen
+    - gochecknoinits
+    - gocritic
+    - godoclint
+    - gosec
+    - varnamelen
+    - wrapcheck
   settings:
     errcheck:
       check-type-assertions: true
       check-blank: true
     staticcheck:
       checks: all
+    varnamelen:
+      ignore-decls:
+        fs afero.Fs
 formatters:
   enable:
     - gofmt

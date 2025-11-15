@@ -84,14 +84,14 @@ func ValidatePaths(cfg Config) error {
 	invalidPaths := []string{}
 
 	for _, job := range cfg.Jobs {
-		err1 := ValidatePath(job.Source, cfg.Sources, "source", job.Name)
-		if err1 != nil {
-			invalidPaths = append(invalidPaths, err1.Error())
+		err := ValidatePath(job.Source, cfg.Sources, "source", job.Name)
+		if err != nil {
+			invalidPaths = append(invalidPaths, err.Error())
 		}
 
-		err2 := ValidatePath(job.Target, cfg.Targets, "target", job.Name)
-		if err2 != nil {
-			invalidPaths = append(invalidPaths, err2.Error())
+		err = ValidatePath(job.Target, cfg.Targets, "target", job.Name)
+		if err != nil {
+			invalidPaths = append(invalidPaths, err.Error())
 		}
 	}
 
@@ -145,21 +145,25 @@ func LoadResolvedConfig(configPath string) Config {
 		log.Fatalf("Failed to parse YAML: %v", err)
 	}
 
-	if err := ValidateJobNames(cfg.Jobs); err != nil {
+	err = ValidateJobNames(cfg.Jobs)
+	if err != nil {
 		log.Fatalf("Job validation failed: %v", err)
 	}
 
 	resolvedCfg := resolveConfig(cfg)
 
-	if err := ValidatePaths(resolvedCfg); err != nil {
+	err = ValidatePaths(resolvedCfg)
+	if err != nil {
 		log.Fatalf("Path validation failed: %v", err)
 	}
 
-	if err := validateJobPaths(resolvedCfg.Jobs, "source", func(job Job) string { return job.Source }); err != nil {
+	err = validateJobPaths(resolvedCfg.Jobs, "source", func(job Job) string { return job.Source })
+	if err != nil {
 		log.Fatalf("Job source path validation failed: %v", err)
 	}
 
-	if err := validateJobPaths(resolvedCfg.Jobs, "target", func(job Job) string { return job.Target }); err != nil {
+	err = validateJobPaths(resolvedCfg.Jobs, "target", func(job Job) string { return job.Target })
+	if err != nil {
 		log.Fatalf("Job target path validation failed: %v", err)
 	}
 

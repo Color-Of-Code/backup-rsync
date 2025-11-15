@@ -69,7 +69,13 @@ func TestIsExcludedGlobally(t *testing.T) {
 	}
 }
 
-func runListUncoveredPathsTest(t *testing.T, fakeFS map[string][]string, cfg internal.Config, expectedUncoveredPaths []string) {
+func runListUncoveredPathsTest(
+	t *testing.T,
+	fakeFS map[string][]string,
+	cfg internal.Config,
+	expectedUncoveredPaths []string,
+) {
+	t.Helper()
 	// Create an in-memory filesystem using Afero
 	fs := afero.NewMemMapFs()
 

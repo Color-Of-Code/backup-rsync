@@ -1,4 +1,4 @@
-// Commands for backup-tool
+// Package cmd contains the commands for the backup-tool CLI application.
 package cmd
 
 import (

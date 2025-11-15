@@ -341,7 +341,9 @@ func TestValidatePaths(t *testing.T) {
 				},
 			},
 			expectsError: true,
-			errorMessage: "path validation errors: [invalid source path for job 'job1': /invalid/source invalid target path for job 'job1': /invalid/target]",
+			errorMessage: "path validation errors: [" +
+				"invalid source path for job 'job1': /invalid/source " +
+				"invalid target path for job 'job1': /invalid/target]",
 		},
 	}
 

@@ -6,11 +6,13 @@ import (
 
 // Centralized type definitions
 
+// Path represents a source or target path with optional exclusions.
 type Path struct {
 	Path       string   `yaml:"path"`
 	Exclusions []string `yaml:"exclusions"`
 }
 
+// Config represents the overall backup configuration.
 type Config struct {
 	Sources   []Path            `yaml:"sources"`
 	Targets   []Path            `yaml:"targets"`
@@ -18,6 +20,7 @@ type Config struct {
 	Jobs      []Job             `yaml:"jobs"`
 }
 
+// Job represents a backup job configuration for a source/target pair.
 type Job struct {
 	Name       string   `yaml:"name"`
 	Source     string   `yaml:"source"`

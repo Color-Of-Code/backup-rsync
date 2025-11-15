@@ -8,6 +8,8 @@ import (
 	"backup-rsync/backup/internal"
 )
 
+const statusSuccess = "SUCCESS"
+
 var capturedArgs []string
 
 var mockExecCommand = func(name string, args ...string) *exec.Cmd {
@@ -62,7 +64,7 @@ func TestExecuteJob(t *testing.T) {
 	simulate := true
 
 	status := internal.ExecuteJob(job, simulate, false, "")
-	if status != "SUCCESS" {
+	if status != statusSuccess {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
 
@@ -93,7 +95,7 @@ func TestExecuteJob(t *testing.T) {
 	}
 }
 
-// Ensure all references to ExecuteJob are prefixed with internal
+// Ensure all references to ExecuteJob are prefixed with internal.
 func TestJobSkippedEnabledTrue(t *testing.T) {
 	job := internal.Job{
 		Name:    "test_job",
@@ -103,7 +105,7 @@ func TestJobSkippedEnabledTrue(t *testing.T) {
 	}
 
 	status := internal.ExecuteJob(job, true, false, "")
-	if status != "SUCCESS" {
+	if status != statusSuccess {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
 }
@@ -132,7 +134,7 @@ func TestJobSkippedEnabledOmitted(t *testing.T) {
 	}
 
 	status := internal.ExecuteJob(job, true, false, "")
-	if status != "SUCCESS" {
+	if status != statusSuccess {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
 }
@@ -151,7 +153,7 @@ func TestExecuteJobWithMockedRsync(t *testing.T) {
 	}
 	status := internal.ExecuteJob(job, true, false, "")
 
-	if status != "SUCCESS" {
+	if status != statusSuccess {
 		t.Errorf("Expected status SUCCESS, got %s", status)
 	}
 

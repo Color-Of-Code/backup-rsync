@@ -11,10 +11,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const filePermission = 0644
+const logDirPermission = 0755
+
 func getLogPath(create bool) string {
 	logPath := "logs/sync-" + time.Now().Format("2006-01-02T15-04-05")
 	if create {
-		err := os.MkdirAll(logPath, 0755)
+		err := os.MkdirAll(logPath, logDirPermission)
 		if err != nil {
 			log.Fatalf("Failed to create log directory: %v", err)
 		}
@@ -28,7 +31,7 @@ func executeSyncJobs(cfg internal.Config, simulate bool) {
 
 	overallLogPath := logPath + "/summary.log"
 
-	overallLogFile, err := os.OpenFile(overallLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	overallLogFile, err := os.OpenFile(overallLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, filePermission)
 	if err != nil {
 		log.Fatalf("Failed to open overall log file: %v", err)
 	}
