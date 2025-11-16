@@ -9,13 +9,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func AddCheckCommands(rootCmd *cobra.Command, configPath string) {
+func AddCheckCommands(rootCmd *cobra.Command) {
 	var fs = afero.NewOsFs()
 
 	var checkCmd = &cobra.Command{
 		Use:   "check-coverage",
 		Short: "Check path coverage",
 		Run: func(cmd *cobra.Command, args []string) {
+			configPath, _ := cmd.Flags().GetString("config")
 			cfg := internal.LoadResolvedConfig(configPath)
 			uncoveredPaths := internal.ListUncoveredPaths(fs, cfg)
 

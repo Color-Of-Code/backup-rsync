@@ -55,11 +55,12 @@ func listCommands(cfg internal.Config) {
 	}
 }
 
-func AddBackupCommands(rootCmd *cobra.Command, configPath string) {
+func AddBackupCommands(rootCmd *cobra.Command) {
 	var runCmd = &cobra.Command{
 		Use:   "run",
 		Short: "Execute the sync jobs",
 		Run: func(cmd *cobra.Command, args []string) {
+			configPath, _ := cmd.Flags().GetString("config")
 			cfg := internal.LoadResolvedConfig(configPath)
 			executeSyncJobs(cfg, false)
 		},
@@ -69,6 +70,7 @@ func AddBackupCommands(rootCmd *cobra.Command, configPath string) {
 		Use:   "simulate",
 		Short: "Simulate the sync jobs",
 		Run: func(cmd *cobra.Command, args []string) {
+			configPath, _ := cmd.Flags().GetString("config")
 			cfg := internal.LoadResolvedConfig(configPath)
 			executeSyncJobs(cfg, true)
 		},
@@ -78,6 +80,7 @@ func AddBackupCommands(rootCmd *cobra.Command, configPath string) {
 		Use:   "list",
 		Short: "List the commands that will be executed",
 		Run: func(cmd *cobra.Command, args []string) {
+			configPath, _ := cmd.Flags().GetString("config")
 			cfg := internal.LoadResolvedConfig(configPath)
 			listCommands(cfg)
 		},

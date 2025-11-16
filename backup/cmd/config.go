@@ -10,7 +10,7 @@ import (
 )
 
 // AddConfigCommands binds the config command and its subcommands to the root command.
-func AddConfigCommands(rootCmd *cobra.Command, configPath string) {
+func AddConfigCommands(rootCmd *cobra.Command) {
 	// configCmd represents the config command.
 	var configCmd = &cobra.Command{
 		Use:   "config",
@@ -26,6 +26,7 @@ func AddConfigCommands(rootCmd *cobra.Command, configPath string) {
 		Use:   "show",
 		Short: "Show resolved configuration",
 		Run: func(cmd *cobra.Command, args []string) {
+			configPath, _ := cmd.Flags().GetString("config")
 			cfg := internal.LoadResolvedConfig(configPath)
 
 			out, err := yaml.Marshal(cfg)
@@ -42,6 +43,7 @@ func AddConfigCommands(rootCmd *cobra.Command, configPath string) {
 		Use:   "validate",
 		Short: "Validate configuration",
 		Run: func(cmd *cobra.Command, args []string) {
+			configPath, _ := cmd.Flags().GetString("config")
 			internal.LoadResolvedConfig(configPath)
 			fmt.Println("Configuration is valid.")
 		},
