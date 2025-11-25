@@ -28,7 +28,7 @@ func GetLogPath(create bool) string {
 	return logPath
 }
 
-func ExecuteSyncJobs(cfg Config, simulate bool) {
+func ExecuteSyncJobs(cfg Config, simulate bool, rsyncPath string) {
 	logPath := GetLogPath(true)
 
 	overallLogPath := logPath + "/summary.log"
@@ -46,6 +46,16 @@ func ExecuteSyncJobs(cfg Config, simulate bool) {
 	}()
 
 	overallLogger := log.New(overallLogFile, "", log.LstdFlags)
+
+	var executor CommandExecutor = &RealCommandExecutor{}
+
+	versionInfo, err := FetchRsyncVersion(executor, rsyncPath)
+	if err != nil {
+		overallLogger.Printf("Failed to fetch rsync version: %v", err)
+	} else {
+		overallLogger.Printf("Rsync Binary Path: %s", rsyncPath)
+		overallLogger.Printf("Rsync Version Info: %s", versionInfo)
+	}
 
 	for _, job := range cfg.Jobs {
 		jobLogPath := fmt.Sprintf("%s/job-%s.log", logPath, job.Name)

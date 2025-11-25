@@ -1,35 +1,17 @@
 package internal_test
 
 import (
-	"errors"
+	"backup-rsync/backup/internal"
 	"strings"
 	"testing"
-
-	"backup-rsync/backup/internal"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// Static error for testing.
-var ErrExitStatus23 = errors.New("exit status 23")
-
 const statusSuccess = "SUCCESS"
 
-// MockCommandExecutor implements CommandExecutor for testing.
-type MockCommandExecutor struct {
-	CapturedCommands []MockCommand
-}
-
-// MockCommand represents a captured command execution.
-type MockCommand struct {
-	Name string
-	Args []string
-}
-
-// Option defines a function that modifies a Job.
 type Option func(*internal.Job)
 
-// NewJob is a job factory with defaults.
 func NewJob(opts ...Option) *internal.Job {
 	// Default values
 	job := &internal.Job{
@@ -77,29 +59,6 @@ func WithExclusions(exclusions []string) Option {
 	return func(p *internal.Job) {
 		p.Exclusions = exclusions
 	}
-}
-
-// Execute captures the command and simulates execution.
-func (m *MockCommandExecutor) Execute(name string, args ...string) ([]byte, error) {
-	m.CapturedCommands = append(m.CapturedCommands, MockCommand{
-		Name: name,
-		Args: append([]string{}, args...), // Make a copy of args
-	})
-
-	if name == "rsync" {
-		// Simulate different scenarios based on arguments
-		argsStr := strings.Join(args, " ")
-
-		if strings.Contains(argsStr, "/invalid/source/path") {
-			errMsg := "rsync: link_stat \"/invalid/source/path\" failed: No such file or directory"
-
-			return []byte(errMsg), ErrExitStatus23
-		}
-
-		return []byte("mocked rsync success"), nil
-	}
-
-	return []byte("command not mocked"), nil
 }
 
 func TestBuildRsyncCmd(t *testing.T) {

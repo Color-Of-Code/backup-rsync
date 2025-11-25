@@ -12,8 +12,10 @@ func buildSimulateCommand() *cobra.Command {
 		Short: "Simulate the sync jobs",
 		Run: func(cmd *cobra.Command, args []string) {
 			configPath, _ := cmd.Flags().GetString("config")
+			rsyncPath, _ := cmd.Flags().GetString("rsync-path")
+
 			cfg := internal.LoadResolvedConfig(configPath)
-			internal.ExecuteSyncJobs(cfg, true)
+			internal.ExecuteSyncJobs(cfg, true, rsyncPath)
 		},
 	}
 }

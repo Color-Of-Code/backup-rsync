@@ -12,6 +12,7 @@ func BuildRootCommand() *cobra.Command {
 	}
 
 	rootCmd.PersistentFlags().String("config", "config.yaml", "Path to the configuration file")
+	rootCmd.PersistentFlags().String("rsync-path", "/usr/bin/rsync", "Path to the rsync binary")
 
 	rootCmd.AddCommand(
 		buildListCommand(),
@@ -19,6 +20,7 @@ func BuildRootCommand() *cobra.Command {
 		buildSimulateCommand(),
 		buildConfigCommand(),
 		buildCheckCoverageCommand(),
+		buildVersionCommand(),
 	)
 
 	return rootCmd

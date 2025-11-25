@@ -1,31 +1,12 @@
 package internal
 
 import (
-	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 )
 
-// CommandExecutor interface for executing commands.
-type CommandExecutor interface {
-	Execute(name string, args ...string) ([]byte, error)
-}
-
-// RealCommandExecutor implements CommandExecutor using actual os/exec.
-type RealCommandExecutor struct{}
-
-// Execute runs the actual command.
-func (r *RealCommandExecutor) Execute(name string, args ...string) ([]byte, error) {
-	ctx := context.Background()
-	cmd := exec.CommandContext(ctx, name, args...)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute command '%s %s': %w", name, strings.Join(args, " "), err)
-	}
-
-	return output, nil
+func BuildRsyncVersionCmd() []string {
+	return []string{"--version"}
 }
 
 func BuildRsyncCmd(job Job, simulate bool, logPath string) []string {
@@ -51,9 +32,7 @@ func BuildRsyncCmd(job Job, simulate bool, logPath string) []string {
 }
 
 func ExecuteJob(job Job, simulate bool, show bool, logPath string) string {
-	var osExec CommandExecutor = &RealCommandExecutor{}
-
-	return ExecuteJobWithExecutor(job, simulate, show, logPath, osExec)
+	return ExecuteJobWithExecutor(job, simulate, show, logPath, &RealCommandExecutor{})
 }
 
 func ExecuteJobWithExecutor(job Job, simulate bool, show bool, logPath string, executor CommandExecutor) string {

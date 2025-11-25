@@ -26,11 +26,13 @@ func TestBuildRootCommand_HelpOutput(t *testing.T) {
 	assert.Contains(t, helpOutput, "backup is a CLI tool for managing backups and configurations.",
 		"Help output should contain the long description")
 	assert.Contains(t, helpOutput, "backup [command]", "Help output should contain usage")
-	assert.Contains(t, helpOutput, "--config string   Path to the configuration file (default \"config.yaml\")",
-		"Help output should contain the persistent flag description")
+
+	// check persistent flags
+	assert.Contains(t, helpOutput, "--config string       Path to the configuration file (default \"config.yaml\")")
+	assert.Contains(t, helpOutput, "--rsync-path string   Path to the rsync binary (default \"/usr/bin/rsync\")")
 
 	// check each sub-command is listed
-	subCommands := []string{"list", "run", "simulate", "config", "check-coverage"}
+	subCommands := []string{"list", "run", "simulate", "config", "check-coverage", "version"}
 	for _, cmdName := range subCommands {
 		assert.Regexp(t, "(?m)^  "+cmdName, helpOutput, "Help output should list the sub-command: "+cmdName)
 	}
