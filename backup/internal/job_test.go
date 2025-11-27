@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"backup-rsync/backup/internal"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Static error for testing.
@@ -101,7 +103,6 @@ func (m *MockCommandExecutor) Execute(name string, args ...string) ([]byte, erro
 }
 
 func TestBuildRsyncCmd(t *testing.T) {
-	// This test doesn't need mocking since it only builds args
 	job := *NewJob(
 		WithSource("/home/user/Music/"),
 		WithTarget("/target/user/music/home"),
@@ -115,9 +116,7 @@ func TestBuildRsyncCmd(t *testing.T) {
 		"/home/user/Music/", "/target/user/music/home",
 	}
 
-	if strings.Join(args, " ") != strings.Join(expectedArgs, " ") {
-		t.Errorf("Expected %v, got %v", expectedArgs, args)
-	}
+	assert.Equal(t, strings.Join(expectedArgs, " "), strings.Join(args, " "))
 }
 
 func TestExecuteJob(t *testing.T) {
@@ -133,7 +132,7 @@ func TestExecuteJob(t *testing.T) {
 	simulate := true
 
 	status := internal.ExecuteJobWithExecutor(job, simulate, false, "", mockExecutor)
-	expectStatus(t, status, statusSuccess)
+	assert.Equal(t, statusSuccess, status)
 
 	disabledJob := *NewJob(
 		WithName("disabled_job"),
@@ -143,7 +142,7 @@ func TestExecuteJob(t *testing.T) {
 	)
 
 	status = internal.ExecuteJobWithExecutor(disabledJob, simulate, false, "", mockExecutor)
-	expectStatus(t, status, "SKIPPED")
+	assert.Equal(t, "SKIPPED", status)
 
 	// Test case for failure (simulate by providing invalid source path)
 	invalidJob := *NewJob(
@@ -153,7 +152,7 @@ func TestExecuteJob(t *testing.T) {
 	)
 
 	status = internal.ExecuteJobWithExecutor(invalidJob, false, false, "", mockExecutor)
-	expectStatus(t, status, "FAILURE")
+	assert.Equal(t, "FAILURE", status)
 }
 
 // Ensure all references to ExecuteJob are prefixed with internal.
@@ -168,7 +167,7 @@ func TestJobSkippedEnabledTrue(t *testing.T) {
 	)
 
 	status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
-	expectStatus(t, status, statusSuccess)
+	assert.Equal(t, statusSuccess, status)
 }
 
 func TestJobSkippedEnabledFalse(t *testing.T) {
@@ -183,7 +182,7 @@ func TestJobSkippedEnabledFalse(t *testing.T) {
 	)
 
 	status := internal.ExecuteJobWithExecutor(disabledJob, true, false, "", mockExecutor)
-	expectStatus(t, status, "SKIPPED")
+	assert.Equal(t, "SKIPPED", status)
 }
 
 func TestJobSkippedEnabledOmitted(t *testing.T) {
@@ -197,7 +196,7 @@ func TestJobSkippedEnabledOmitted(t *testing.T) {
 	)
 
 	status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
-	expectStatus(t, status, statusSuccess)
+	assert.Equal(t, statusSuccess, status)
 }
 
 func TestExecuteJobWithMockedRsync(t *testing.T) {
@@ -212,29 +211,11 @@ func TestExecuteJobWithMockedRsync(t *testing.T) {
 	)
 	status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
 
-	expectStatus(t, status, statusSuccess)
-
-	// Check that rsync was called with the expected arguments
-	if len(mockExecutor.CapturedCommands) == 0 {
-		t.Errorf("Expected at least one command to be executed")
-
-		return
-	}
+	assert.Equal(t, statusSuccess, status)
+	assert.NotEmpty(t, mockExecutor.CapturedCommands)
 
 	cmd := mockExecutor.CapturedCommands[0]
-	if cmd.Name != "rsync" {
-		t.Errorf("Expected command to be 'rsync', got %s", cmd.Name)
-	}
 
-	if len(cmd.Args) == 0 || cmd.Args[0] != "--dry-run" {
-		t.Errorf("Expected --dry-run flag, got %v", cmd.Args)
-	}
-}
-
-func expectStatus(t *testing.T, status, expectedStatus string) {
-	t.Helper()
-
-	if status != expectedStatus {
-		t.Errorf("Expected status %s, got %s", expectedStatus, status)
-	}
+	assert.Equal(t, "rsync", cmd.Name, "Command name mismatch")
+	assert.Contains(t, cmd.Args, "--dry-run", "Expected --dry-run flag in command arguments")
 }

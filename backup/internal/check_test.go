@@ -5,15 +5,15 @@ import (
 	"log"
 	"path/filepath"
 	"sort"
-	"strings"
 	"testing"
 
 	"backup-rsync/backup/internal"
 
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestIsExcludedGlobally(t *testing.T) {
+func TestIsExcludedGlobally_PathGloballyExcluded(t *testing.T) {
 	sources := []internal.Path{
 		{
 			Path:       "/home/data/",
@@ -25,48 +25,62 @@ func TestIsExcludedGlobally(t *testing.T) {
 		},
 	}
 
-	tests := []struct {
-		name         string
-		path         string
-		expectsError bool
-		expectedLog  string
-	}{
+	var logBuffer bytes.Buffer
+	log.SetOutput(&logBuffer)
+
+	path := "/home/data/projects/P1"
+	expectsError := true
+	expectedLog := "Path '/home/data/projects/P1' is globally excluded by '/projects/P1/' in source '/home/data/'"
+
+	result := internal.IsExcludedGlobally(path, sources)
+	assert.Equal(t, expectsError, result)
+	assert.Contains(t, logBuffer.String(), expectedLog)
+}
+
+func TestIsExcludedGlobally_PathNotExcluded(t *testing.T) {
+	sources := []internal.Path{
 		{
-			name:         "Path is globally excluded",
-			path:         "/home/data/projects/P1",
-			expectsError: true,
-			expectedLog:  "Path '/home/data/projects/P1' is globally excluded by '/projects/P1/' in source '/home/data/'",
+			Path:       "/home/data/",
+			Exclusions: []string{"/projects/P1/", "/media/"},
 		},
 		{
-			name:         "Path is not excluded",
-			path:         "/home/data/projects/Other",
-			expectsError: false,
-		},
-		{
-			name:         "Path is excluded in another source",
-			path:         "/home/user/cache",
-			expectsError: true,
-			expectedLog:  "Path '/home/user/cache' is globally excluded by '/cache/' in source '/home/user/'",
+			Path:       "/home/user/",
+			Exclusions: []string{"/cache/", "/npm/"},
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			var logBuffer bytes.Buffer
-			log.SetOutput(&logBuffer)
+	var logBuffer bytes.Buffer
+	log.SetOutput(&logBuffer)
 
-			result := internal.IsExcludedGlobally(test.path, sources)
-			if result != test.expectsError {
-				t.Errorf("Expected exclusion result %v, got %v", test.expectsError, result)
-			}
+	path := "/home/data/projects/Other"
+	expectsError := false
 
-			if test.expectsError {
-				if !strings.Contains(logBuffer.String(), test.expectedLog) {
-					t.Errorf("Expected log message '%s', but got '%s'", test.expectedLog, logBuffer.String())
-				}
-			}
-		})
+	result := internal.IsExcludedGlobally(path, sources)
+	assert.Equal(t, expectsError, result)
+}
+
+func TestIsExcludedGlobally_PathExcludedInAnotherSource(t *testing.T) {
+	sources := []internal.Path{
+		{
+			Path:       "/home/data/",
+			Exclusions: []string{"/projects/P1/", "/media/"},
+		},
+		{
+			Path:       "/home/user/",
+			Exclusions: []string{"/cache/", "/npm/"},
+		},
 	}
+
+	var logBuffer bytes.Buffer
+	log.SetOutput(&logBuffer)
+
+	path := "/home/user/cache"
+	expectsError := true
+	expectedLog := "Path '/home/user/cache' is globally excluded by '/cache/' in source '/home/user/'"
+
+	result := internal.IsExcludedGlobally(path, sources)
+	assert.Equal(t, expectsError, result)
+	assert.Contains(t, logBuffer.String(), expectedLog)
 }
 
 func runListUncoveredPathsTest(
@@ -95,24 +109,8 @@ func runListUncoveredPathsTest(
 	sort.Strings(uncoveredPaths)
 	sort.Strings(expectedUncoveredPaths)
 
-	if len(uncoveredPaths) != len(expectedUncoveredPaths) {
-		t.Errorf("Expected uncovered paths length %d, got %d. Expected: %v, Got: %v",
-			len(expectedUncoveredPaths), len(uncoveredPaths), expectedUncoveredPaths, uncoveredPaths)
-
-		return
-	}
-
-	for count, path := range uncoveredPaths {
-		if count >= len(expectedUncoveredPaths) {
-			t.Errorf("Got more uncovered paths than expected. Got: %v", uncoveredPaths)
-
-			return
-		}
-
-		if path != expectedUncoveredPaths[count] {
-			t.Errorf("Expected uncovered path '%s', got '%s'", expectedUncoveredPaths[count], path)
-		}
-	}
+	assert.Len(t, uncoveredPaths, len(expectedUncoveredPaths))
+	assert.ElementsMatch(t, expectedUncoveredPaths, uncoveredPaths)
 }
 
 // Variation: all paths used.

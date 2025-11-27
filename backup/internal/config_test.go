@@ -2,9 +2,10 @@ package internal_test
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
 	"backup-rsync/backup/internal"
@@ -24,30 +25,15 @@ jobs:
 	reader := bytes.NewReader([]byte(yamlData))
 
 	cfg, err := internal.LoadConfig(reader)
-	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
+	require.NoError(t, err)
 
-	if cfg.Variables["target_base"] != "/mnt/backup1" {
-		t.Errorf("Expected /mnt/backup1, got %s", cfg.Variables["target_base"])
-	}
-
-	if len(cfg.Jobs) != 1 {
-		t.Fatalf("Expected 1 job, got %d", len(cfg.Jobs))
-	}
+	assert.Equal(t, "/mnt/backup1", cfg.Variables["target_base"])
+	assert.Len(t, cfg.Jobs, 1)
 
 	job := cfg.Jobs[0]
-	if job.Name != "test_job" {
-		t.Errorf("Expected job name test_job, got %s", job.Name)
-	}
-
-	if job.Source != "/home/test/" {
-		t.Errorf("Expected source /home/test/, got %s", job.Source)
-	}
-
-	if job.Target != "${target_base}/test/" {
-		t.Errorf("Expected target ${target_base}/test/, got %s", job.Target)
-	}
+	assert.Equal(t, "test_job", job.Name)
+	assert.Equal(t, "/home/test/", job.Source)
+	assert.Equal(t, "${target_base}/test/", job.Target)
 }
 
 func TestLoadConfig2(t *testing.T) {
@@ -63,13 +49,10 @@ jobs:
     enabled: false
 `
 
-	// Use a reader instead of a mock file
 	reader := bytes.NewReader([]byte(yamlData))
 
 	cfg, err := internal.LoadConfig(reader)
-	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
+	require.NoError(t, err)
 
 	expected := []internal.Job{
 		{
@@ -89,7 +72,7 @@ jobs:
 	}
 
 	for i, job := range cfg.Jobs {
-		assertJobEqual(t, job, expected[i])
+		assert.Equal(t, expected[i], job, "Job mismatch at index %d", i)
 	}
 }
 
@@ -110,11 +93,8 @@ target: "/target"
 	var job internal.Job
 
 	err := yaml.Unmarshal([]byte(yamlData), &job)
-	if err != nil {
-		t.Fatalf("Failed to unmarshal YAML: %v", err)
-	}
-
-	assertJobEqual(t, job, expected)
+	require.NoError(t, err)
+	assert.Equal(t, expected, job)
 }
 
 func TestYAMLUnmarshalingDefaults_ExplicitFalseValues(t *testing.T) {
@@ -136,11 +116,8 @@ enabled: false
 	var job internal.Job
 
 	err := yaml.Unmarshal([]byte(yamlData), &job)
-	if err != nil {
-		t.Fatalf("Failed to unmarshal YAML: %v", err)
-	}
-
-	assertJobEqual(t, job, expected)
+	require.NoError(t, err)
+	assert.Equal(t, expected, job)
 }
 
 func TestYAMLUnmarshalingDefaults_MixedValues(t *testing.T) {
@@ -161,11 +138,8 @@ delete: false
 	var job internal.Job
 
 	err := yaml.Unmarshal([]byte(yamlData), &job)
-	if err != nil {
-		t.Fatalf("Failed to unmarshal YAML: %v", err)
-	}
-
-	assertJobEqual(t, job, expected)
+	require.NoError(t, err)
+	assert.Equal(t, expected, job)
 }
 
 func TestSubstituteVariables(t *testing.T) {
@@ -176,87 +150,50 @@ func TestSubstituteVariables(t *testing.T) {
 	expected := "/mnt/backup1/user/music/home"
 
 	result := internal.SubstituteVariables(input, variables)
-	if result != expected {
-		t.Errorf("Expected %s, got %s", expected, result)
-	}
+	assert.Equal(t, expected, result, "SubstituteVariables result mismatch")
 }
 
-func TestValidateJobNames(t *testing.T) {
-	tests := []struct {
-		name         string
-		jobs         []internal.Job
-		expectsError bool
-		errorMessage string
-	}{
-		{
-			name: "Valid job names",
-			jobs: []internal.Job{
-				{Name: "job1"},
-				{Name: "job2"},
-			},
-			expectsError: false,
-		},
-		{
-			name: "Duplicate job names",
-			jobs: []internal.Job{
-				{Name: "job1"},
-				{Name: "job1"},
-			},
-			expectsError: true,
-			errorMessage: "duplicate job name: job1",
-		},
-		{
-			name: "Invalid characters in job name",
-			jobs: []internal.Job{
-				{Name: "job 1"},
-			},
-			expectsError: true,
-			errorMessage: "invalid characters in job name: job 1",
-		},
-		{
-			name: "Mixed errors",
-			jobs: []internal.Job{
-				{Name: "job1"},
-				{Name: "job 1"},
-				{Name: "job1"},
-			},
-			expectsError: true,
-			errorMessage: "duplicate job name: job1",
-		},
+func TestValidateJobNames_ValidJobNames(t *testing.T) {
+	jobs := []internal.Job{
+		{Name: "job1"},
+		{Name: "job2"},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := internal.ValidateJobNames(test.jobs)
-			if test.expectsError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if !strings.Contains(err.Error(), test.errorMessage) {
-					t.Errorf("Expected error message to contain '%s', but got '%s'", test.errorMessage, err.Error())
-				}
-			} else {
-				expectNoError(t, err)
-			}
-		})
-	}
+	err := internal.ValidateJobNames(jobs)
+	assert.NoError(t, err)
 }
 
-func expectNoError(t *testing.T, err error) {
-	t.Helper()
-
-	if err != nil {
-		t.Errorf("Expected no error but got: %v", err)
+func TestValidateJobNames_DuplicateJobNames(t *testing.T) {
+	jobs := []internal.Job{
+		{Name: "job1"},
+		{Name: "job1"},
 	}
+
+	err := internal.ValidateJobNames(jobs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate job name: job1")
 }
 
-func expectError(t *testing.T, err error, expectedMessage string) {
-	t.Helper()
-
-	if err == nil {
-		t.Errorf("Expected error but got none")
-	} else if err.Error() != expectedMessage {
-		t.Errorf("Expected error message '%s', but got '%s'", expectedMessage, err.Error())
+func TestValidateJobNames_InvalidCharactersInJobName(t *testing.T) {
+	jobs := []internal.Job{
+		{Name: "job 1"},
 	}
+
+	err := internal.ValidateJobNames(jobs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid characters in job name: job 1")
+}
+
+func TestValidateJobNames_MixedErrors(t *testing.T) {
+	jobs := []internal.Job{
+		{Name: "job1"},
+		{Name: "job 1"},
+		{Name: "job1"},
+	}
+
+	err := internal.ValidateJobNames(jobs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate job name: job1")
 }
 
 func TestValidatePath_ValidSourcePath(t *testing.T) {
@@ -271,7 +208,8 @@ func TestValidatePath_ValidSourcePath(t *testing.T) {
 	}
 
 	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
-	expectNoError(t, err)
+
+	assert.NoError(t, err)
 }
 
 func TestValidatePath_InvalidSourcePath(t *testing.T) {
@@ -286,7 +224,9 @@ func TestValidatePath_InvalidSourcePath(t *testing.T) {
 	}
 
 	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
-	expectError(t, err, "invalid path for job 'job1': source /invalid/source")
+
+	require.Error(t, err)
+	assert.EqualError(t, err, "invalid path for job 'job1': source /invalid/source")
 }
 
 func TestValidatePath_ValidTargetPath(t *testing.T) {
@@ -301,7 +241,8 @@ func TestValidatePath_ValidTargetPath(t *testing.T) {
 	}
 
 	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
-	expectNoError(t, err)
+
+	assert.NoError(t, err)
 }
 
 func TestValidatePath_InvalidTargetPath(t *testing.T) {
@@ -316,83 +257,64 @@ func TestValidatePath_InvalidTargetPath(t *testing.T) {
 	}
 
 	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
-	expectError(t, err, "invalid path for job 'job1': target /invalid/target")
+
+	require.Error(t, err)
+	assert.EqualError(t, err, "invalid path for job 'job1': target /invalid/target")
 }
 
-func TestValidatePaths(t *testing.T) {
-	tests := []struct {
+func TestValidatePaths_ValidPaths(t *testing.T) {
+	test := struct {
+		name         string
+		cfg          internal.Config
+		expectsError bool
+	}{
+		name: "Valid paths",
+		cfg: internal.Config{
+			Sources: []internal.Path{
+				{Path: "/home/user"},
+			},
+			Targets: []internal.Path{
+				{Path: "/mnt/backup"},
+			},
+			Jobs: []internal.Job{
+				{Name: "job1", Source: "/home/user/documents", Target: "/mnt/backup/documents"},
+			},
+		},
+	}
+
+	t.Run(test.name, func(t *testing.T) {
+		err := internal.ValidatePaths(test.cfg)
+		assert.NoError(t, err)
+	})
+}
+
+func TestValidatePaths_InvalidPaths(t *testing.T) {
+	test := struct {
 		name         string
 		cfg          internal.Config
 		expectsError bool
 		errorMessage string
 	}{
-		{
-			name: "Valid paths",
-			cfg: internal.Config{
-				Sources: []internal.Path{
-					{Path: "/home/user"},
-				},
-				Targets: []internal.Path{
-					{Path: "/mnt/backup"},
-				},
-				Jobs: []internal.Job{
-					{Name: "job1", Source: "/home/user/documents", Target: "/mnt/backup/documents"},
-				},
+		name: "Invalid paths",
+		cfg: internal.Config{
+			Sources: []internal.Path{
+				{Path: "/home/user"},
 			},
-			expectsError: false,
-		},
-		{
-			name: "Invalid paths",
-			cfg: internal.Config{
-				Sources: []internal.Path{
-					{Path: "/home/user"},
-				},
-				Targets: []internal.Path{
-					{Path: "/mnt/backup"},
-				},
-				Jobs: []internal.Job{
-					{Name: "job1", Source: "/invalid/source", Target: "/invalid/target"},
-				},
+			Targets: []internal.Path{
+				{Path: "/mnt/backup"},
 			},
-			expectsError: true,
-			errorMessage: "path validation failed: [" +
-				"invalid path for job 'job1': source /invalid/source " +
-				"invalid path for job 'job1': target /invalid/target]",
+			Jobs: []internal.Job{
+				{Name: "job1", Source: "/invalid/source", Target: "/invalid/target"},
+			},
 		},
+		errorMessage: "path validation failed: [" +
+			"invalid path for job 'job1': source /invalid/source " +
+			"invalid path for job 'job1': target /invalid/target]",
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := internal.ValidatePaths(test.cfg)
-			if test.expectsError {
-				expectError(t, err, test.errorMessage)
-			} else {
-				expectNoError(t, err)
-			}
-		})
-	}
-}
-
-func assertJobEqual(t *testing.T, got, expected internal.Job) {
-	t.Helper()
-
-	if got.Name != expected.Name {
-		t.Errorf("Job name mismatch: got %s, want %s", got.Name, expected.Name)
-	}
-
-	if got.Source != expected.Source {
-		t.Errorf("Job source mismatch: got %s, want %s", got.Source, expected.Source)
-	}
-
-	if got.Target != expected.Target {
-		t.Errorf("Job target mismatch: got %s, want %s", got.Target, expected.Target)
-	}
-
-	if got.Delete != expected.Delete {
-		t.Errorf("Job delete flag mismatch: got %v, want %v", got.Delete, expected.Delete)
-	}
-
-	if got.Enabled != expected.Enabled {
-		t.Errorf("Job enabled flag mismatch: got %v, want %v", got.Enabled, expected.Enabled)
-	}
+	t.Run(test.name, func(t *testing.T) {
+		err := internal.ValidatePaths(test.cfg)
+		require.Error(t, err)
+		assert.EqualError(t, err, test.errorMessage)
+	})
 }
