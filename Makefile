@@ -67,3 +67,8 @@ release: release-linux-amd64 release-darwin-amd64 release-windows-amd64 checksum
 			printf "%-40s %-15s %-64s\n" "$$file" "Size: $$size bytes" "Checksum: $$checksum"; \
 		fi; \
 	done
+
+report-size: build
+	go install github.com/Zxilly/go-size-analyzer/cmd/gsa@latest
+	gsa --web --listen=":8910" --open dist/backup
+
