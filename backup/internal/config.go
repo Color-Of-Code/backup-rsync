@@ -148,9 +148,10 @@ func LoadResolvedConfig(configPath string) Config {
 	if err != nil {
 		log.Fatalf("Failed to open config: %v", err)
 	}
-	defer configFile.Close()
 
 	cfg, err := LoadConfig(configFile)
+	_ = configFile.Close()
+
 	if err != nil {
 		log.Fatalf("Failed to parse YAML: %v", err)
 	}
