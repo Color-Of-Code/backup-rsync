@@ -72,3 +72,11 @@ report-size: build
 	go install github.com/Zxilly/go-size-analyzer/cmd/gsa@latest
 	gsa --web --listen=":8910" --open dist/backup
 
+report-coverage:
+	@mkdir -p coverage
+	@go test ./... -count=1 -coverprofile=coverage/coverage.out -coverpkg=./backup/...
+	@echo
+	@echo "Coverage Summary:"
+	@go tool cover -func=coverage/coverage.out
+	@go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+	@echo "Coverage report generated at coverage/coverage.html"
