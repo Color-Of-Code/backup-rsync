@@ -17,9 +17,11 @@ func Execute() {
 
 	rootCmd.PersistentFlags().String("config", "config.yaml", "Path to the configuration file")
 
-	AddConfigCommands(rootCmd)
-	AddBackupCommands(rootCmd)
-	AddCheckCommands(rootCmd)
+	rootCmd.AddCommand(buildListCommand())
+	rootCmd.AddCommand(buildRunCommand())
+	rootCmd.AddCommand(buildSimulateCommand())
+	rootCmd.AddCommand(buildConfigCommand())
+	rootCmd.AddCommand(buildCheckCoverageCommand())
 
 	err := rootCmd.Execute()
 	if err != nil {

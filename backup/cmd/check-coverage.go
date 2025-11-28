@@ -9,10 +9,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func AddCheckCommands(rootCmd *cobra.Command) {
+func buildCheckCoverageCommand() *cobra.Command {
 	var fs = afero.NewOsFs()
 
-	var checkCmd = &cobra.Command{
+	return &cobra.Command{
 		Use:   "check-coverage",
 		Short: "Check path coverage",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -27,6 +27,4 @@ func AddCheckCommands(rootCmd *cobra.Command) {
 			}
 		},
 	}
-
-	rootCmd.AddCommand(checkCmd)
 }

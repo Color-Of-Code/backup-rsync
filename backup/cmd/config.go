@@ -9,9 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// AddConfigCommands binds the config command and its subcommands to the root command.
-func AddConfigCommands(rootCmd *cobra.Command) {
-	// configCmd represents the config command.
+func buildConfigCommand() *cobra.Command {
 	var configCmd = &cobra.Command{
 		Use:   "config",
 		Short: "Manage configuration",
@@ -21,8 +19,7 @@ func AddConfigCommands(rootCmd *cobra.Command) {
 		},
 	}
 
-	// Extend the config subcommand with the show verb.
-	var showCmd = &cobra.Command{
+	var showVerb = &cobra.Command{
 		Use:   "show",
 		Short: "Show resolved configuration",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -38,8 +35,7 @@ func AddConfigCommands(rootCmd *cobra.Command) {
 		},
 	}
 
-	// Extend the config subcommand with the validate verb.
-	var validateCmd = &cobra.Command{
+	var validateVerb = &cobra.Command{
 		Use:   "validate",
 		Short: "Validate configuration",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -49,7 +45,8 @@ func AddConfigCommands(rootCmd *cobra.Command) {
 		},
 	}
 
-	rootCmd.AddCommand(configCmd)
-	configCmd.AddCommand(showCmd)
-	configCmd.AddCommand(validateCmd)
+	configCmd.AddCommand(showVerb)
+	configCmd.AddCommand(validateVerb)
+
+	return configCmd
 }
