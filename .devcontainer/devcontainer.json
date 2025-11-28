@@ -10,7 +10,11 @@
         "eamodio.gitlens",
         "streetsidesoftware.code-spell-checker",
         "esbenp.prettier-vscode"
-      ]
-    }
+      ],
+      "settings": {
+        "terminal.integrated.cwd": "/workspaces/backup"
+      }
+    },
+    "workspaceFolder": "/workspaces/backup"
   }
 }
