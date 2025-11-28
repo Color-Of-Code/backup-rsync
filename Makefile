@@ -1,7 +1,7 @@
 # Makefile to build the project and place the binary in the dist/ directory
 
 # Build command with common flags
-BUILD_CMD = CGO_ENABLED=0 go build -ldflags="-s -w"
+BUILD_CMD = CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -tags=prod
 PACKAGE = ./backup/main.go
 
 .PHONY: build clean test lint tidy checksums release sanity-check check-mod-tidy lint-config-check  lint-fix format check-clean
