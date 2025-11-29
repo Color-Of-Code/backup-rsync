@@ -3,20 +3,14 @@ package cmd
 import (
 	"backup-rsync/backup/internal"
 	"fmt"
-	"log"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 func buildConfigCommand() *cobra.Command {
 	var configCmd = &cobra.Command{
 		Use:   "config",
 		Short: "Manage configuration",
-		Run: func(cmd *cobra.Command, args []string) {
-			// Implementation for the config command
-			fmt.Println("Config command executed")
-		},
 	}
 
 	var showVerb = &cobra.Command{
@@ -26,12 +20,7 @@ func buildConfigCommand() *cobra.Command {
 			configPath, _ := cmd.Flags().GetString("config")
 			cfg := internal.LoadResolvedConfig(configPath)
 
-			out, err := yaml.Marshal(cfg)
-			if err != nil {
-				log.Fatalf("Failed to marshal resolved configuration: %v", err)
-			}
-
-			fmt.Printf("Resolved Configuration:\n%s\n", string(out))
+			fmt.Printf("Resolved Configuration:\n%s\n", cfg)
 		},
 	}
 

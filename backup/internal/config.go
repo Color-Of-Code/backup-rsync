@@ -20,6 +20,12 @@ var (
 	ErrOverlappingPath = errors.New("overlapping path detected")
 )
 
+func (cfg Config) String() string {
+	out, _ := yaml.Marshal(cfg)
+
+	return string(out)
+}
+
 func LoadConfig(reader io.Reader) (Config, error) {
 	var cfg Config
 

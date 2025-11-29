@@ -318,3 +318,17 @@ func TestValidatePaths_InvalidPaths(t *testing.T) {
 		assert.EqualError(t, err, test.errorMessage)
 	})
 }
+
+func TestConfigString_ValidConfig(t *testing.T) {
+	cfg := internal.Config{
+		Sources:   []internal.Path{},
+		Targets:   []internal.Path{},
+		Variables: map[string]string{},
+		Jobs:      []internal.Job{},
+	}
+
+	expectedOutput := "sources: []\ntargets: []\nvariables: {}\njobs: []\n"
+	actualOutput := cfg.String()
+
+	assert.Equal(t, expectedOutput, actualOutput)
+}
