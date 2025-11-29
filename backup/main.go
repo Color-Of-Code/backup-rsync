@@ -2,8 +2,14 @@ package main
 
 import (
 	"backup-rsync/backup/cmd"
+	"os"
 )
 
 func main() {
-	cmd.Execute()
+	rootCmd := cmd.BuildRootCommand()
+
+	err := rootCmd.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
 }

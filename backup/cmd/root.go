@@ -1,30 +1,25 @@
-// Package cmd contains the commands for the backup-tool CLI application.
 package cmd
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 )
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-func Execute() {
+func BuildRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
-		Use:   "backup-tool",
+		Use:   "backup",
 		Short: "A tool for managing backups",
-		Long:  `backup-tool is a CLI tool for managing backups and configurations.`,
+		Long:  `backup is a CLI tool for managing backups and configurations.`,
 	}
 
 	rootCmd.PersistentFlags().String("config", "config.yaml", "Path to the configuration file")
 
-	rootCmd.AddCommand(buildListCommand())
-	rootCmd.AddCommand(buildRunCommand())
-	rootCmd.AddCommand(buildSimulateCommand())
-	rootCmd.AddCommand(buildConfigCommand())
-	rootCmd.AddCommand(buildCheckCoverageCommand())
+	rootCmd.AddCommand(
+		buildListCommand(),
+		buildRunCommand(),
+		buildSimulateCommand(),
+		buildConfigCommand(),
+		buildCheckCoverageCommand(),
+	)
 
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
-	}
+	return rootCmd
 }
