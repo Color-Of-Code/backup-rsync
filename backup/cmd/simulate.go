@@ -15,8 +15,7 @@ func buildSimulateCommand() *cobra.Command {
 			rsyncPath, _ := cmd.Flags().GetString("rsync-path")
 
 			cfg := internal.LoadResolvedConfig(configPath)
-			command := internal.NewRSyncCommand(rsyncPath)
-			command.Simulate = true
+			command := internal.NewRSyncSimulateCommand(rsyncPath)
 
 			cfg.Apply(command)
 		},

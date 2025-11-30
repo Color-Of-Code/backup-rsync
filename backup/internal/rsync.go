@@ -24,6 +24,22 @@ func NewRSyncCommand(binPath string) RSyncCommand {
 	}
 }
 
+func NewRSyncSimulateCommand(binPath string) RSyncCommand {
+	return RSyncCommand{
+		BinPath:  binPath,
+		Simulate: true,
+		Executor: &RealSync{},
+	}
+}
+
+func NewListCommand(binPath string) RSyncCommand {
+	return RSyncCommand{
+		BinPath:  binPath,
+		ListOnly: true,
+		Executor: &RealSync{},
+	}
+}
+
 func (command RSyncCommand) GetVersionInfo() (string, error) {
 	rsyncPath := command.BinPath
 
@@ -31,7 +47,7 @@ func (command RSyncCommand) GetVersionInfo() (string, error) {
 		return "", fmt.Errorf("%w: \"%s\"", ErrInvalidRsyncPath, rsyncPath)
 	}
 
-	output, err := command.Run("--version")
+	output, err := command.Executor.Execute("--version")
 	if err != nil {
 		return "", fmt.Errorf("error fetching rsync version: %w", err)
 	}
@@ -44,7 +60,7 @@ func (command RSyncCommand) GetVersionInfo() (string, error) {
 	return string(output), nil
 }
 
-func (command RSyncCommand) ArgumentsForJob(job Job, logPath string) []string {
+func ArgumentsForJob(job Job, logPath string, simulate bool) []string {
 	args := []string{"-aiv", "--stats"}
 	if job.Delete {
 		args = append(args, "--delete")
@@ -59,13 +75,28 @@ func (command RSyncCommand) ArgumentsForJob(job Job, logPath string) []string {
 	}
 
 	args = append(args, job.Source, job.Target)
-	if command.Simulate {
+	if simulate {
 		args = append([]string{"--dry-run"}, args...)
 	}
 
 	return args
 }
 
-func (command RSyncCommand) Run(args ...string) ([]byte, error) {
-	return command.Executor.Execute(command.BinPath, args...)
+func (rsync RSyncCommand) Run(job Job, logPath string) string {
+	args := ArgumentsForJob(job, logPath, rsync.Simulate)
+	fmt.Printf("Job: %s\n", job.Name)
+	fmt.Printf("Command: rsync %s %s\n", rsync.BinPath, strings.Join(args, " "))
+
+	if rsync.ListOnly {
+		return "SUCCESS"
+	}
+
+	out, err := rsync.Executor.Execute(rsync.BinPath, args...)
+	fmt.Printf("Output:\n%s\n", string(out))
+
+	if err != nil {
+		return "FAILURE"
+	}
+
+	return "SUCCESS"
 }

@@ -20,10 +20,7 @@ func TestArgumentsForJob(t *testing.T) {
 		WithTarget("/target/user/music/home"),
 		WithExclusions([]string{"*.tmp", "node_modules/"}),
 	)
-	command := internal.RSyncCommand{
-		Simulate: true,
-	}
-	args := command.ArgumentsForJob(job, "")
+	args := internal.ArgumentsForJob(job, "", true)
 
 	expectedArgs := []string{
 		"--dry-run", "-aiv", "--stats", "--delete",

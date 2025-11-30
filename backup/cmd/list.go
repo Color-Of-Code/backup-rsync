@@ -14,8 +14,7 @@ func buildListCommand() *cobra.Command {
 			configPath, _ := cmd.Flags().GetString("config")
 			rsyncPath, _ := cmd.Flags().GetString("rsync-path")
 			cfg := internal.LoadResolvedConfig(configPath)
-			command := internal.NewRSyncCommand(rsyncPath)
-			command.ListOnly = true
+			command := internal.NewListCommand(rsyncPath)
 
 			cfg.Apply(command)
 		},
