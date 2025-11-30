@@ -26,6 +26,33 @@ func (cfg Config) String() string {
 	return string(out)
 }
 
+func (cfg Config) Apply(rsync RSyncCommand) {
+	overallLogger, logPath := createLogger(rsync.ListOnly)
+
+	versionInfo, err := rsync.GetVersionInfo()
+	if err != nil {
+		overallLogger.Printf("Failed to fetch rsync version: %v", err)
+	} else {
+		overallLogger.Printf("Rsync Binary Path: %s", rsync.BinPath)
+		overallLogger.Printf("Rsync Version Info: %s", versionInfo)
+	}
+
+	for _, job := range cfg.Jobs {
+		jobLogPath := fmt.Sprintf("%s/job-%s.log", logPath, job.Name)
+		status := job.Apply(rsync, jobLogPath)
+		overallLogger.Printf("STATUS [%s]: %s", job.Name, status)
+		fmt.Printf("Status [%s]: %s\n", job.Name, status)
+	}
+}
+
+func createLogger(dummy bool) (*log.Logger, string) {
+	if dummy {
+		return log.New(io.Discard, "", 0), ""
+	}
+
+	return createFileLogger()
+}
+
 func LoadConfig(reader io.Reader) (Config, error) {
 	var cfg Config
 

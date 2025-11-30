@@ -1,9 +1,56 @@
 package internal
 
+import (
+	"fmt"
+
+	"gopkg.in/yaml.v3"
+)
+
+// JobYAML is a helper struct for proper YAML unmarshaling with defaults.
+type JobYAML struct {
+	Name       string   `yaml:"name"`
+	Source     string   `yaml:"source"`
+	Target     string   `yaml:"target"`
+	Delete     *bool    `yaml:"delete"`
+	Enabled    *bool    `yaml:"enabled"`
+	Exclusions []string `yaml:"exclusions,omitempty"`
+}
+
 func (job Job) Apply(rsync RSyncCommand, logPath string) string {
 	if !job.Enabled {
 		return "SKIPPED"
 	}
 
 	return rsync.Run(job, logPath)
+}
+
+// UnmarshalYAML implements custom YAML unmarshaling to handle defaults properly.
+func (job *Job) UnmarshalYAML(node *yaml.Node) error {
+	var jobYAML JobYAML
+
+	err := node.Decode(&jobYAML)
+	if err != nil {
+		return fmt.Errorf("failed to decode YAML node: %w", err)
+	}
+
+	// Copy basic fields
+	job.Name = jobYAML.Name
+	job.Source = jobYAML.Source
+	job.Target = jobYAML.Target
+	job.Exclusions = jobYAML.Exclusions
+
+	// Handle boolean fields with defaults
+	if jobYAML.Delete != nil {
+		job.Delete = *jobYAML.Delete
+	} else {
+		job.Delete = true // default value
+	}
+
+	if jobYAML.Enabled != nil {
+		job.Enabled = *jobYAML.Enabled
+	} else {
+		job.Enabled = true // default value
+	}
+
+	return nil
 }
