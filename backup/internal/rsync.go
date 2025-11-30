@@ -31,7 +31,7 @@ func (command RSyncCommand) GetVersionInfo() (string, error) {
 		return "", fmt.Errorf("%w: \"%s\"", ErrInvalidRsyncPath, rsyncPath)
 	}
 
-	output, err := command.Executor.Execute(rsyncPath, "--version")
+	output, err := command.Run("--version")
 	if err != nil {
 		return "", fmt.Errorf("error fetching rsync version: %w", err)
 	}
@@ -64,4 +64,8 @@ func (command RSyncCommand) ArgumentsForJob(job Job, logPath string) []string {
 	}
 
 	return args
+}
+
+func (command RSyncCommand) Run(args ...string) ([]byte, error) {
+	return command.Executor.Execute(command.BinPath, args...)
 }

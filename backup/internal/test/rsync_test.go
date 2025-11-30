@@ -14,16 +14,14 @@ var errCommandNotFound = errors.New("command not found")
 
 const rsyncPath = "/usr/bin/rsync"
 
-func TestBuildRsyncCmd(t *testing.T) {
+func TestArgumentsForJob(t *testing.T) {
 	job := *NewJob(
 		WithSource("/home/user/Music/"),
 		WithTarget("/target/user/music/home"),
 		WithExclusions([]string{"*.tmp", "node_modules/"}),
 	)
 	command := internal.RSyncCommand{
-		BinPath:  rsyncPath,
 		Simulate: true,
-		Executor: nil,
 	}
 	args := command.ArgumentsForJob(job, "")
 
@@ -36,7 +34,7 @@ func TestBuildRsyncCmd(t *testing.T) {
 	assert.Equal(t, strings.Join(expectedArgs, " "), strings.Join(args, " "))
 }
 
-func TestFetchRsyncVersion_Success(t *testing.T) {
+func TestGetVersionInfo_Success(t *testing.T) {
 	rsync := internal.RSyncCommand{
 		BinPath: rsyncPath,
 		Executor: &MockCommandExecutor{
@@ -51,7 +49,7 @@ func TestFetchRsyncVersion_Success(t *testing.T) {
 	assert.Equal(t, "rsync  version 3.2.3  protocol version 31\n", versionInfo)
 }
 
-func TestFetchRsyncVersion_CommandError(t *testing.T) {
+func TestGetVersionInfo_CommandError(t *testing.T) {
 	rsync := internal.RSyncCommand{
 		BinPath: rsyncPath,
 		Executor: &MockCommandExecutor{
@@ -66,7 +64,7 @@ func TestFetchRsyncVersion_CommandError(t *testing.T) {
 	assert.Empty(t, versionInfo)
 }
 
-func TestFetchRsyncVersion_InvalidOutput(t *testing.T) {
+func TestGetVersionInfo_InvalidOutput(t *testing.T) {
 	rsync := internal.RSyncCommand{
 		BinPath: rsyncPath,
 		Executor: &MockCommandExecutor{
@@ -81,7 +79,7 @@ func TestFetchRsyncVersion_InvalidOutput(t *testing.T) {
 	assert.Empty(t, versionInfo)
 }
 
-func TestFetchRsyncVersion_EmptyPath(t *testing.T) {
+func TestGetVersionInfo_EmptyPath(t *testing.T) {
 	rsync := internal.RSyncCommand{
 		BinPath: "",
 		Executor: &MockCommandExecutor{
@@ -97,7 +95,7 @@ func TestFetchRsyncVersion_EmptyPath(t *testing.T) {
 	assert.Empty(t, versionInfo)
 }
 
-func TestFetchRsyncVersion_IncompletePath(t *testing.T) {
+func TestGetVersionInfo_IncompletePath(t *testing.T) {
 	rsync := internal.RSyncCommand{
 		BinPath: "bin/rsync",
 		Executor: &MockCommandExecutor{
