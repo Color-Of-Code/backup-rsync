@@ -10,58 +10,114 @@ import (
 var ErrInvalidRsyncVersion = errors.New("invalid rsync version output")
 var ErrInvalidRsyncPath = errors.New("rsync path must be an absolute path")
 
-type RSyncCommand struct {
-	BinPath  string
-	Simulate bool
-	ListOnly bool
+type SyncCommand struct {
+	BinPath     string
+	BaseLogPath string
+
 	Executor JobRunner
 }
 
-func NewRSyncCommand(binPath string) RSyncCommand {
-	return RSyncCommand{
-		BinPath:  binPath,
-		Executor: &RealSync{},
+func NewSyncCommand(binPath string, logPath string) SyncCommand {
+	return SyncCommand{
+		BinPath:     binPath,
+		BaseLogPath: logPath,
+		Executor:    &RealSync{},
 	}
 }
 
-func NewRSyncSimulateCommand(binPath string) RSyncCommand {
-	return RSyncCommand{
-		BinPath:  binPath,
-		Simulate: true,
-		Executor: &RealSync{},
+func (command SyncCommand) Run(job Job) string {
+	logPath := fmt.Sprintf("%s/job-%s.log", command.BaseLogPath, job.Name)
+
+	args := ArgumentsForJob(job, logPath, false)
+
+	return command.RunWithArgs(job, args)
+}
+
+func (command SyncCommand) PrintArgs(job Job, args []string) {
+	fmt.Printf("Job: %s\n", job.Name)
+	fmt.Printf("Command: %s %s\n", command.BinPath, strings.Join(args, " "))
+}
+
+func (command SyncCommand) RunWithArgs(job Job, args []string) string {
+	command.PrintArgs(job, args)
+
+	out, err := command.Executor.Execute(command.BinPath, args...)
+	fmt.Printf("Output:\n%s\n", string(out))
+
+	if err != nil {
+		return "FAILURE"
+	}
+
+	return "SUCCESS"
+}
+
+type SimulateCommand struct {
+	SyncCommand
+}
+
+func NewSimulateCommand(binPath string, logPath string) SimulateCommand {
+	return SimulateCommand{
+		SyncCommand: SyncCommand{
+			BinPath:     binPath,
+			BaseLogPath: logPath,
+			Executor:    &RealSync{},
+		},
 	}
 }
 
-func NewListCommand(binPath string) RSyncCommand {
-	return RSyncCommand{
-		BinPath:  binPath,
-		ListOnly: true,
-		Executor: &RealSync{},
-	}
+func (command SimulateCommand) Run(job Job) string {
+	logPath := fmt.Sprintf("%s/job-%s.log", command.BaseLogPath, job.Name)
+
+	args := ArgumentsForJob(job, logPath, true)
+
+	return command.RunWithArgs(job, args)
 }
 
-func (command RSyncCommand) GetVersionInfo() (string, error) {
+type ListCommand struct {
+	SyncCommand
+}
+
+func NewListCommand(binPath string) ListCommand {
+	return ListCommand{
+		SyncCommand: SyncCommand{
+			BinPath:     binPath,
+			BaseLogPath: "",
+			Executor:    &RealSync{},
+		},
+	}
+}
+func (command ListCommand) Run(job Job) string {
+	logPath := fmt.Sprintf("%s/job-%s.log", command.BaseLogPath, job.Name)
+
+	args := ArgumentsForJob(job, logPath, false)
+	command.PrintArgs(job, args)
+
+	return "SUCCESS"
+}
+
+func (command SyncCommand) GetVersionInfo() (string, string, error) {
 	rsyncPath := command.BinPath
 
 	if !filepath.IsAbs(rsyncPath) {
-		return "", fmt.Errorf("%w: \"%s\"", ErrInvalidRsyncPath, rsyncPath)
+		return "", "", fmt.Errorf("%w: \"%s\"", ErrInvalidRsyncPath, rsyncPath)
 	}
 
-	output, err := command.Executor.Execute("--version")
+	output, err := command.Executor.Execute(command.BinPath, "--version")
 	if err != nil {
-		return "", fmt.Errorf("error fetching rsync version: %w", err)
+		return "", "", fmt.Errorf("error fetching rsync version: %w", err)
 	}
 
 	// Validate output
 	if !strings.Contains(string(output), "rsync") || !strings.Contains(string(output), "protocol version") {
-		return "", fmt.Errorf("%w: %s", ErrInvalidRsyncVersion, output)
+		return "", "", fmt.Errorf("%w: %s", ErrInvalidRsyncVersion, output)
 	}
 
-	return string(output), nil
+	return string(output), rsyncPath, nil
 }
 
 func ArgumentsForJob(job Job, logPath string, simulate bool) []string {
 	args := []string{"-aiv", "--stats"}
+
 	if job.Delete {
 		args = append(args, "--delete")
 	}
@@ -80,23 +136,4 @@ func ArgumentsForJob(job Job, logPath string, simulate bool) []string {
 	}
 
 	return args
-}
-
-func (rsync RSyncCommand) Run(job Job, logPath string) string {
-	args := ArgumentsForJob(job, logPath, rsync.Simulate)
-	fmt.Printf("Job: %s\n", job.Name)
-	fmt.Printf("Command: rsync %s %s\n", rsync.BinPath, strings.Join(args, " "))
-
-	if rsync.ListOnly {
-		return "SUCCESS"
-	}
-
-	out, err := rsync.Executor.Execute(rsync.BinPath, args...)
-	fmt.Printf("Output:\n%s\n", string(out))
-
-	if err != nil {
-		return "FAILURE"
-	}
-
-	return "SUCCESS"
 }

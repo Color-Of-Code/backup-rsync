@@ -32,7 +32,7 @@ func TestArgumentsForJob(t *testing.T) {
 }
 
 func TestGetVersionInfo_Success(t *testing.T) {
-	rsync := internal.RSyncCommand{
+	rsync := internal.SyncCommand{
 		BinPath: rsyncPath,
 		Executor: &MockCommandExecutor{
 			Output: "rsync  version 3.2.3  protocol version 31\n",
@@ -40,14 +40,15 @@ func TestGetVersionInfo_Success(t *testing.T) {
 		},
 	}
 
-	versionInfo, err := rsync.GetVersionInfo()
+	versionInfo, fullpath, err := rsync.GetVersionInfo()
 
 	require.NoError(t, err)
+	assert.Equal(t, rsyncPath, fullpath)
 	assert.Equal(t, "rsync  version 3.2.3  protocol version 31\n", versionInfo)
 }
 
 func TestGetVersionInfo_CommandError(t *testing.T) {
-	rsync := internal.RSyncCommand{
+	rsync := internal.SyncCommand{
 		BinPath: rsyncPath,
 		Executor: &MockCommandExecutor{
 			Output: "",
@@ -55,14 +56,15 @@ func TestGetVersionInfo_CommandError(t *testing.T) {
 		},
 	}
 
-	versionInfo, err := rsync.GetVersionInfo()
+	versionInfo, fullpath, err := rsync.GetVersionInfo()
 
 	require.Error(t, err)
+	assert.Empty(t, fullpath)
 	assert.Empty(t, versionInfo)
 }
 
 func TestGetVersionInfo_InvalidOutput(t *testing.T) {
-	rsync := internal.RSyncCommand{
+	rsync := internal.SyncCommand{
 		BinPath: rsyncPath,
 		Executor: &MockCommandExecutor{
 			Output: "invalid output",
@@ -70,14 +72,15 @@ func TestGetVersionInfo_InvalidOutput(t *testing.T) {
 		},
 	}
 
-	versionInfo, err := rsync.GetVersionInfo()
+	versionInfo, fullpath, err := rsync.GetVersionInfo()
 
 	require.Error(t, err)
+	assert.Empty(t, fullpath)
 	assert.Empty(t, versionInfo)
 }
 
 func TestGetVersionInfo_EmptyPath(t *testing.T) {
-	rsync := internal.RSyncCommand{
+	rsync := internal.SyncCommand{
 		BinPath: "",
 		Executor: &MockCommandExecutor{
 			Output: "",
@@ -85,15 +88,16 @@ func TestGetVersionInfo_EmptyPath(t *testing.T) {
 		},
 	}
 
-	versionInfo, err := rsync.GetVersionInfo()
+	versionInfo, fullpath, err := rsync.GetVersionInfo()
 
 	require.Error(t, err)
 	require.EqualError(t, err, "rsync path must be an absolute path: \"\"")
 	assert.Empty(t, versionInfo)
+	assert.Empty(t, fullpath)
 }
 
 func TestGetVersionInfo_IncompletePath(t *testing.T) {
-	rsync := internal.RSyncCommand{
+	rsync := internal.SyncCommand{
 		BinPath: "bin/rsync",
 		Executor: &MockCommandExecutor{
 			Output: "",
@@ -101,9 +105,10 @@ func TestGetVersionInfo_IncompletePath(t *testing.T) {
 		},
 	}
 
-	versionInfo, err := rsync.GetVersionInfo()
+	versionInfo, fullpath, err := rsync.GetVersionInfo()
 
 	require.Error(t, err)
 	require.EqualError(t, err, "rsync path must be an absolute path: \"bin/rsync\"")
 	assert.Empty(t, versionInfo)
+	assert.Empty(t, fullpath)
 }

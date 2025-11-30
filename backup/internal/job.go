@@ -16,12 +16,12 @@ type JobYAML struct {
 	Exclusions []string `yaml:"exclusions,omitempty"`
 }
 
-func (job Job) Apply(rsync RSyncCommand, logPath string) string {
+func (job Job) Apply(rsync JobCommand) string {
 	if !job.Enabled {
 		return "SKIPPED"
 	}
 
-	return rsync.Run(job, logPath)
+	return rsync.Run(job)
 }
 
 // UnmarshalYAML implements custom YAML unmarshaling to handle defaults properly.

@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"backup-rsync/backup/internal"
+	"io"
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -16,7 +18,8 @@ func buildListCommand() *cobra.Command {
 			cfg := internal.LoadResolvedConfig(configPath)
 			command := internal.NewListCommand(rsyncPath)
 
-			cfg.Apply(command)
+			logger := log.New(io.Discard, "", 0)
+			cfg.Apply(command, logger)
 		},
 	}
 }

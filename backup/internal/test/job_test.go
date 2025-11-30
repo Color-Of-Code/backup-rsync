@@ -60,16 +60,24 @@ func WithExclusions(exclusions []string) Option {
 	}
 }
 
-func newMockRSyncCommand(simulate bool) internal.RSyncCommand {
-	return internal.RSyncCommand{
+func newMockSyncCommand() internal.SyncCommand {
+	return internal.SyncCommand{
 		BinPath:  "/usr/bin/rsync",
-		Simulate: simulate,
 		Executor: &MockCommandExecutor{},
 	}
 }
 
+func newMockSimulateCommand() internal.SimulateCommand {
+	return internal.SimulateCommand{
+		SyncCommand: internal.SyncCommand{
+			BinPath:  "/usr/bin/rsync",
+			Executor: &MockCommandExecutor{},
+		},
+	}
+}
+
 func TestApply(t *testing.T) {
-	rsync := newMockRSyncCommand(true)
+	rsync := newMockSimulateCommand()
 
 	job := *NewJob(
 		WithName("test_job"),
@@ -78,14 +86,11 @@ func TestApply(t *testing.T) {
 		WithExclusions([]string{"*.tmp"}),
 	)
 
-	status := job.Apply(rsync, "")
+	status := job.Apply(rsync)
 	assert.Equal(t, statusSuccess, status)
 }
 func TestApply_Disabled(t *testing.T) {
-	command := internal.RSyncCommand{
-		BinPath:  "/usr/bin/rsync",
-		Executor: &MockCommandExecutor{},
-	}
+	command := newMockSyncCommand()
 
 	disabledJob := *NewJob(
 		WithName("disabled_job"),
@@ -94,12 +99,12 @@ func TestApply_Disabled(t *testing.T) {
 		WithEnabled(false),
 	)
 
-	status := disabledJob.Apply(command, "")
+	status := disabledJob.Apply(command)
 	assert.Equal(t, "SKIPPED", status)
 }
 
 func TestApply_Invalid(t *testing.T) {
-	rsync := newMockRSyncCommand(false)
+	rsync := newMockSyncCommand()
 
 	// Test case for failure (simulate by providing invalid source path)
 	invalidJob := *NewJob(
@@ -108,12 +113,12 @@ func TestApply_Invalid(t *testing.T) {
 		WithTarget("/mnt/backup1/invalid/"),
 	)
 
-	status := invalidJob.Apply(rsync, "")
+	status := invalidJob.Apply(rsync)
 	assert.Equal(t, "FAILURE", status)
 }
 
 func TestJobSkippedEnabledTrue(t *testing.T) {
-	rsync := newMockRSyncCommand(false)
+	rsync := newMockSyncCommand()
 
 	job := *NewJob(
 		WithName("test_job"),
@@ -121,12 +126,12 @@ func TestJobSkippedEnabledTrue(t *testing.T) {
 		WithTarget("/mnt/backup1/test/"),
 	)
 
-	status := job.Apply(rsync, "")
+	status := job.Apply(rsync)
 	assert.Equal(t, statusSuccess, status)
 }
 
 func TestJobSkippedEnabledFalse(t *testing.T) {
-	rsync := newMockRSyncCommand(false)
+	rsync := newMockSyncCommand()
 
 	disabledJob := *NewJob(
 		WithName("disabled_job"),
@@ -135,12 +140,12 @@ func TestJobSkippedEnabledFalse(t *testing.T) {
 		WithEnabled(false),
 	)
 
-	status := disabledJob.Apply(rsync, "")
+	status := disabledJob.Apply(rsync)
 	assert.Equal(t, "SKIPPED", status)
 }
 
 func TestJobSkippedEnabledOmitted(t *testing.T) {
-	rsync := newMockRSyncCommand(false)
+	rsync := newMockSyncCommand()
 
 	job := *NewJob(
 		WithName("omitted_enabled_job"),
@@ -148,13 +153,13 @@ func TestJobSkippedEnabledOmitted(t *testing.T) {
 		WithTarget("/mnt/backup1/omitted/"),
 	)
 
-	status := job.Apply(rsync, "")
+	status := job.Apply(rsync)
 	assert.Equal(t, statusSuccess, status)
 }
 
 func TestApplyWithMockedRsync(t *testing.T) {
 	mockExecutor := &MockCommandExecutor{}
-	rsync := newMockRSyncCommand(true)
+	rsync := newMockSimulateCommand()
 	rsync.Executor = mockExecutor
 
 	job := *NewJob(
@@ -163,7 +168,7 @@ func TestApplyWithMockedRsync(t *testing.T) {
 		WithTarget("/mnt/backup1/test/"),
 		WithExclusions([]string{"*.tmp"}),
 	)
-	status := job.Apply(rsync, "")
+	status := job.Apply(rsync)
 
 	assert.Equal(t, statusSuccess, status)
 	assert.NotEmpty(t, mockExecutor.CapturedCommands)

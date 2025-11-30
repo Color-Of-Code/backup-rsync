@@ -26,7 +26,7 @@ func getLogPath() string {
 	return logPath
 }
 
-func createFileLogger() (*log.Logger, string) {
+func CreateMainLogger() (*log.Logger, string) {
 	logPath := getLogPath()
 
 	overallLogPath := logPath + "/summary.log"
