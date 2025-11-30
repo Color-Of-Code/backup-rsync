@@ -36,6 +36,7 @@ test:
 	go test ./... -v
 
 tidy:
+	gofmt -s -w .
 	go mod tidy
 
 build:
