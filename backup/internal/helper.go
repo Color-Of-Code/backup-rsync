@@ -3,6 +3,7 @@ package internal
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -16,20 +17,19 @@ func NormalizePath(path string) string {
 const FilePermission = 0644
 const LogDirPermission = 0755
 
-func GetLogPath(create bool) string {
+func GetLogPath() string {
 	logPath := "logs/sync-" + time.Now().Format("2006-01-02T15-04-05")
-	if create {
-		err := os.MkdirAll(logPath, LogDirPermission)
-		if err != nil {
-			log.Fatalf("Failed to create log directory: %v", err)
-		}
+
+	err := os.MkdirAll(logPath, LogDirPermission)
+	if err != nil {
+		log.Fatalf("Failed to create log directory: %v", err)
 	}
 
 	return logPath
 }
 
-func ExecuteSyncJobs(cfg Config, simulate bool, rsyncPath string) {
-	logPath := GetLogPath(true)
+func createFileLogger() (*log.Logger, string) {
+	logPath := GetLogPath()
 
 	overallLogPath := logPath + "/summary.log"
 
@@ -45,21 +45,33 @@ func ExecuteSyncJobs(cfg Config, simulate bool, rsyncPath string) {
 		}
 	}()
 
-	overallLogger := log.New(overallLogFile, "", log.LstdFlags)
+	logger := log.New(overallLogFile, "", log.LstdFlags)
 
-	var executor CommandExecutor = &RealCommandExecutor{}
+	return logger, logPath
+}
 
-	versionInfo, err := FetchRsyncVersion(executor, rsyncPath)
+func createLogger(rsync RSyncCommand) (*log.Logger, string) {
+	if rsync.ListOnly {
+		return log.New(io.Discard, "", 0), ""
+	}
+
+	return createFileLogger()
+}
+
+func (cfg Config) Apply(rsync RSyncCommand) {
+	overallLogger, logPath := createLogger(rsync)
+
+	versionInfo, err := rsync.GetVersionInfo()
 	if err != nil {
 		overallLogger.Printf("Failed to fetch rsync version: %v", err)
 	} else {
-		overallLogger.Printf("Rsync Binary Path: %s", rsyncPath)
+		overallLogger.Printf("Rsync Binary Path: %s", rsync.BinPath)
 		overallLogger.Printf("Rsync Version Info: %s", versionInfo)
 	}
 
 	for _, job := range cfg.Jobs {
 		jobLogPath := fmt.Sprintf("%s/job-%s.log", logPath, job.Name)
-		status := ExecuteJob(job, simulate, false, jobLogPath)
+		status := job.Apply(rsync, jobLogPath)
 		overallLogger.Printf("STATUS [%s]: %s", job.Name, status)
 		fmt.Printf("Status [%s]: %s\n", job.Name, status)
 	}

@@ -19,7 +19,6 @@ func buildConfigCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			configPath, _ := cmd.Flags().GetString("config")
 			cfg := internal.LoadResolvedConfig(configPath)
-
 			fmt.Printf("Resolved Configuration:\n%s\n", cfg)
 		},
 	}

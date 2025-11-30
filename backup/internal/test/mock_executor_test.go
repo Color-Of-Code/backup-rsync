@@ -8,7 +8,7 @@ import (
 // Static error for testing.
 var ErrExitStatus23 = errors.New("exit status 23")
 
-// MockCommandExecutor implements CommandExecutor for testing.
+// MockCommandExecutor implements JobRunner for testing.
 type MockCommandExecutor struct {
 	CapturedCommands []MockCommand
 	Output           string
@@ -39,7 +39,7 @@ func (m *MockCommandExecutor) Execute(name string, args ...string) ([]byte, erro
 	}
 
 	// Simulate specific scenarios for rsync.
-	if name == "rsync" {
+	if name == "/usr/bin/rsync" {
 		argsStr := strings.Join(args, " ")
 
 		if strings.Contains(argsStr, "/invalid/source/path") {

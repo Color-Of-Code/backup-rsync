@@ -23,6 +23,8 @@ type Config struct {
 }
 
 // Job represents a backup job configuration for a source/target pair.
+//
+//nolint:recvcheck // UnmarshalYAML requires pointer receiver while Apply uses value receiver
 type Job struct {
 	Name       string   `yaml:"name"`
 	Source     string   `yaml:"source"`

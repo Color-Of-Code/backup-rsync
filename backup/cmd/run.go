@@ -15,7 +15,9 @@ func buildRunCommand() *cobra.Command {
 			rsyncPath, _ := cmd.Flags().GetString("rsync-path")
 
 			cfg := internal.LoadResolvedConfig(configPath)
-			internal.ExecuteSyncJobs(cfg, false, rsyncPath)
+			command := internal.NewRSyncCommand(rsyncPath)
+
+			cfg.Apply(command)
 		},
 	}
 }

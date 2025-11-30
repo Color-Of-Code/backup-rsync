@@ -1,20 +1,10 @@
 package cmd
 
 import (
-	"fmt"
-
 	"backup-rsync/backup/internal"
 
 	"github.com/spf13/cobra"
 )
-
-func listCommands(cfg internal.Config) {
-	logPath := internal.GetLogPath(false)
-	for _, job := range cfg.Jobs {
-		jobLogPath := fmt.Sprintf("%s/job-%s.log", logPath, job.Name)
-		internal.ExecuteJob(job, false, true, jobLogPath)
-	}
-}
 
 func buildListCommand() *cobra.Command {
 	return &cobra.Command{
@@ -22,8 +12,12 @@ func buildListCommand() *cobra.Command {
 		Short: "List the commands that will be executed",
 		Run: func(cmd *cobra.Command, args []string) {
 			configPath, _ := cmd.Flags().GetString("config")
+			rsyncPath, _ := cmd.Flags().GetString("rsync-path")
 			cfg := internal.LoadResolvedConfig(configPath)
-			listCommands(cfg)
+			command := internal.NewRSyncCommand(rsyncPath)
+			command.ListOnly = true
+
+			cfg.Apply(command)
 		},
 	}
 }

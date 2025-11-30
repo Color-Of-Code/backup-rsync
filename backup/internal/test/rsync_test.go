@@ -3,6 +3,7 @@ package internal_test
 import (
 	"backup-rsync/backup/internal"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,49 +14,83 @@ var errCommandNotFound = errors.New("command not found")
 
 const rsyncPath = "/usr/bin/rsync"
 
-func TestFetchRsyncVersion_Success(t *testing.T) {
-	executor := &MockCommandExecutor{
-		Output: "rsync  version 3.2.3  protocol version 31\n",
-		Error:  nil,
+func TestBuildRsyncCmd(t *testing.T) {
+	job := *NewJob(
+		WithSource("/home/user/Music/"),
+		WithTarget("/target/user/music/home"),
+		WithExclusions([]string{"*.tmp", "node_modules/"}),
+	)
+	command := internal.RSyncCommand{
+		BinPath:  rsyncPath,
+		Simulate: true,
+		Executor: nil,
+	}
+	args := command.ArgumentsForJob(job, "")
+
+	expectedArgs := []string{
+		"--dry-run", "-aiv", "--stats", "--delete",
+		"--exclude=*.tmp", "--exclude=node_modules/",
+		"/home/user/Music/", "/target/user/music/home",
 	}
 
-	versionInfo, err := internal.FetchRsyncVersion(executor, rsyncPath)
+	assert.Equal(t, strings.Join(expectedArgs, " "), strings.Join(args, " "))
+}
+
+func TestFetchRsyncVersion_Success(t *testing.T) {
+	rsync := internal.RSyncCommand{
+		BinPath: rsyncPath,
+		Executor: &MockCommandExecutor{
+			Output: "rsync  version 3.2.3  protocol version 31\n",
+			Error:  nil,
+		},
+	}
+
+	versionInfo, err := rsync.GetVersionInfo()
 
 	require.NoError(t, err)
 	assert.Equal(t, "rsync  version 3.2.3  protocol version 31\n", versionInfo)
 }
 
 func TestFetchRsyncVersion_CommandError(t *testing.T) {
-	executor := &MockCommandExecutor{
-		Output: "",
-		Error:  errCommandNotFound,
+	rsync := internal.RSyncCommand{
+		BinPath: rsyncPath,
+		Executor: &MockCommandExecutor{
+			Output: "",
+			Error:  errCommandNotFound,
+		},
 	}
 
-	versionInfo, err := internal.FetchRsyncVersion(executor, rsyncPath)
+	versionInfo, err := rsync.GetVersionInfo()
 
 	require.Error(t, err)
 	assert.Empty(t, versionInfo)
 }
 
 func TestFetchRsyncVersion_InvalidOutput(t *testing.T) {
-	executor := &MockCommandExecutor{
-		Output: "invalid output",
-		Error:  nil,
+	rsync := internal.RSyncCommand{
+		BinPath: rsyncPath,
+		Executor: &MockCommandExecutor{
+			Output: "invalid output",
+			Error:  nil,
+		},
 	}
 
-	versionInfo, err := internal.FetchRsyncVersion(executor, rsyncPath)
+	versionInfo, err := rsync.GetVersionInfo()
 
 	require.Error(t, err)
 	assert.Empty(t, versionInfo)
 }
 
 func TestFetchRsyncVersion_EmptyPath(t *testing.T) {
-	executor := &MockCommandExecutor{
-		Output: "",
-		Error:  nil,
+	rsync := internal.RSyncCommand{
+		BinPath: "",
+		Executor: &MockCommandExecutor{
+			Output: "",
+			Error:  nil,
+		},
 	}
 
-	versionInfo, err := internal.FetchRsyncVersion(executor, "")
+	versionInfo, err := rsync.GetVersionInfo()
 
 	require.Error(t, err)
 	require.EqualError(t, err, "rsync path must be an absolute path: \"\"")
@@ -63,12 +98,15 @@ func TestFetchRsyncVersion_EmptyPath(t *testing.T) {
 }
 
 func TestFetchRsyncVersion_IncompletePath(t *testing.T) {
-	executor := &MockCommandExecutor{
-		Output: "",
-		Error:  nil,
+	rsync := internal.RSyncCommand{
+		BinPath: "bin/rsync",
+		Executor: &MockCommandExecutor{
+			Output: "",
+			Error:  nil,
+		},
 	}
 
-	versionInfo, err := internal.FetchRsyncVersion(executor, "bin/rsync")
+	versionInfo, err := rsync.GetVersionInfo()
 
 	require.Error(t, err)
 	require.EqualError(t, err, "rsync path must be an absolute path: \"bin/rsync\"")

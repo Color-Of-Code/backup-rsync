@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"backup-rsync/backup/internal"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,26 +60,16 @@ func WithExclusions(exclusions []string) Option {
 	}
 }
 
-func TestBuildRsyncCmd(t *testing.T) {
-	job := *NewJob(
-		WithSource("/home/user/Music/"),
-		WithTarget("/target/user/music/home"),
-		WithExclusions([]string{"*.tmp", "node_modules/"}),
-	)
-	args := internal.BuildRsyncCmd(job, true, "")
-
-	expectedArgs := []string{
-		"--dry-run", "-aiv", "--stats", "--delete",
-		"--exclude=*.tmp", "--exclude=node_modules/",
-		"/home/user/Music/", "/target/user/music/home",
+func newMockRSyncCommand(simulate bool) internal.RSyncCommand {
+	return internal.RSyncCommand{
+		BinPath:  "/usr/bin/rsync",
+		Simulate: simulate,
+		Executor: &MockCommandExecutor{},
 	}
-
-	assert.Equal(t, strings.Join(expectedArgs, " "), strings.Join(args, " "))
 }
 
-func TestExecuteJob(t *testing.T) {
-	// Create mock executor
-	mockExecutor := &MockCommandExecutor{}
+func TestApply(t *testing.T) {
+	rsync := newMockRSyncCommand(true)
 
 	job := *NewJob(
 		WithName("test_job"),
@@ -88,10 +77,15 @@ func TestExecuteJob(t *testing.T) {
 		WithTarget("/mnt/backup1/test/"),
 		WithExclusions([]string{"*.tmp"}),
 	)
-	simulate := true
 
-	status := internal.ExecuteJobWithExecutor(job, simulate, false, "", mockExecutor)
+	status := job.Apply(rsync, "")
 	assert.Equal(t, statusSuccess, status)
+}
+func TestApply_Disabled(t *testing.T) {
+	command := internal.RSyncCommand{
+		BinPath:  "/usr/bin/rsync",
+		Executor: &MockCommandExecutor{},
+	}
 
 	disabledJob := *NewJob(
 		WithName("disabled_job"),
@@ -100,8 +94,12 @@ func TestExecuteJob(t *testing.T) {
 		WithEnabled(false),
 	)
 
-	status = internal.ExecuteJobWithExecutor(disabledJob, simulate, false, "", mockExecutor)
+	status := disabledJob.Apply(command, "")
 	assert.Equal(t, "SKIPPED", status)
+}
+
+func TestApply_Invalid(t *testing.T) {
+	rsync := newMockRSyncCommand(false)
 
 	// Test case for failure (simulate by providing invalid source path)
 	invalidJob := *NewJob(
@@ -110,14 +108,12 @@ func TestExecuteJob(t *testing.T) {
 		WithTarget("/mnt/backup1/invalid/"),
 	)
 
-	status = internal.ExecuteJobWithExecutor(invalidJob, false, false, "", mockExecutor)
+	status := invalidJob.Apply(rsync, "")
 	assert.Equal(t, "FAILURE", status)
 }
 
-// Ensure all references to ExecuteJob are prefixed with internal.
 func TestJobSkippedEnabledTrue(t *testing.T) {
-	// Create mock executor
-	mockExecutor := &MockCommandExecutor{}
+	rsync := newMockRSyncCommand(false)
 
 	job := *NewJob(
 		WithName("test_job"),
@@ -125,13 +121,12 @@ func TestJobSkippedEnabledTrue(t *testing.T) {
 		WithTarget("/mnt/backup1/test/"),
 	)
 
-	status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
+	status := job.Apply(rsync, "")
 	assert.Equal(t, statusSuccess, status)
 }
 
 func TestJobSkippedEnabledFalse(t *testing.T) {
-	// Create mock executor (won't be used since job is disabled)
-	mockExecutor := &MockCommandExecutor{}
+	rsync := newMockRSyncCommand(false)
 
 	disabledJob := *NewJob(
 		WithName("disabled_job"),
@@ -140,13 +135,12 @@ func TestJobSkippedEnabledFalse(t *testing.T) {
 		WithEnabled(false),
 	)
 
-	status := internal.ExecuteJobWithExecutor(disabledJob, true, false, "", mockExecutor)
+	status := disabledJob.Apply(rsync, "")
 	assert.Equal(t, "SKIPPED", status)
 }
 
 func TestJobSkippedEnabledOmitted(t *testing.T) {
-	// Create mock executor
-	mockExecutor := &MockCommandExecutor{}
+	rsync := newMockRSyncCommand(false)
 
 	job := *NewJob(
 		WithName("omitted_enabled_job"),
@@ -154,13 +148,14 @@ func TestJobSkippedEnabledOmitted(t *testing.T) {
 		WithTarget("/mnt/backup1/omitted/"),
 	)
 
-	status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
+	status := job.Apply(rsync, "")
 	assert.Equal(t, statusSuccess, status)
 }
 
-func TestExecuteJobWithMockedRsync(t *testing.T) {
-	// Create mock executor
+func TestApplyWithMockedRsync(t *testing.T) {
 	mockExecutor := &MockCommandExecutor{}
+	rsync := newMockRSyncCommand(true)
+	rsync.Executor = mockExecutor
 
 	job := *NewJob(
 		WithName("test_job"),
@@ -168,13 +163,13 @@ func TestExecuteJobWithMockedRsync(t *testing.T) {
 		WithTarget("/mnt/backup1/test/"),
 		WithExclusions([]string{"*.tmp"}),
 	)
-	status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
+	status := job.Apply(rsync, "")
 
 	assert.Equal(t, statusSuccess, status)
 	assert.NotEmpty(t, mockExecutor.CapturedCommands)
 
 	cmd := mockExecutor.CapturedCommands[0]
 
-	assert.Equal(t, "rsync", cmd.Name, "Command name mismatch")
+	assert.Equal(t, "/usr/bin/rsync", cmd.Name, "Command name mismatch")
 	assert.Contains(t, cmd.Args, "--dry-run", "Expected --dry-run flag in command arguments")
 }

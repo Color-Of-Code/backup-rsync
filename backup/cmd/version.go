@@ -13,11 +13,10 @@ func buildVersionCommand() *cobra.Command {
 		Use:   "version",
 		Short: "Prints the rsync version, protocol version, and full path to the rsync binary.",
 		Run: func(cmd *cobra.Command, args []string) {
-			var executor internal.CommandExecutor = &internal.RealCommandExecutor{}
-
 			rsyncPath, _ := cmd.Flags().GetString("rsync-path")
+			rsync := internal.NewRSyncCommand(rsyncPath)
 
-			output, err := internal.FetchRsyncVersion(executor, rsyncPath)
+			output, err := rsync.GetVersionInfo()
 			if err != nil {
 				fmt.Printf("%v\n", err)
 

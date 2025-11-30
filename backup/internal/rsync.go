@@ -10,14 +10,28 @@ import (
 var ErrInvalidRsyncVersion = errors.New("invalid rsync version output")
 var ErrInvalidRsyncPath = errors.New("rsync path must be an absolute path")
 
-func FetchRsyncVersion(executor CommandExecutor, rsyncPath string) (string, error) {
+type RSyncCommand struct {
+	BinPath  string
+	Simulate bool
+	ListOnly bool
+	Executor JobRunner
+}
+
+func NewRSyncCommand(binPath string) RSyncCommand {
+	return RSyncCommand{
+		BinPath:  binPath,
+		Executor: &RealSync{},
+	}
+}
+
+func (command RSyncCommand) GetVersionInfo() (string, error) {
+	rsyncPath := command.BinPath
+
 	if !filepath.IsAbs(rsyncPath) {
 		return "", fmt.Errorf("%w: \"%s\"", ErrInvalidRsyncPath, rsyncPath)
 	}
 
-	cmdArgs := BuildRsyncVersionCmd()
-
-	output, err := executor.Execute(rsyncPath, cmdArgs...)
+	output, err := command.Executor.Execute(rsyncPath, "--version")
 	if err != nil {
 		return "", fmt.Errorf("error fetching rsync version: %w", err)
 	}
@@ -28,4 +42,26 @@ func FetchRsyncVersion(executor CommandExecutor, rsyncPath string) (string, erro
 	}
 
 	return string(output), nil
+}
+
+func (command RSyncCommand) ArgumentsForJob(job Job, logPath string) []string {
+	args := []string{"-aiv", "--stats"}
+	if job.Delete {
+		args = append(args, "--delete")
+	}
+
+	if logPath != "" {
+		args = append(args, "--log-file="+logPath)
+	}
+
+	for _, excl := range job.Exclusions {
+		args = append(args, "--exclude="+excl)
+	}
+
+	args = append(args, job.Source, job.Target)
+	if command.Simulate {
+		args = append([]string{"--dry-run"}, args...)
+	}
+
+	return args
 }
