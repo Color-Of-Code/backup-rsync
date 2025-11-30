@@ -38,13 +38,6 @@ func createFileLogger() (*log.Logger, string) {
 		log.Fatalf("Failed to open overall log file: %v", err)
 	}
 
-	defer func() {
-		err := overallLogFile.Close()
-		if err != nil {
-			log.Fatalf("Failed to close overall log file: %v", err)
-		}
-	}()
-
 	logger := log.New(overallLogFile, "", log.LstdFlags)
 
 	return logger, logPath
