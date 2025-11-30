@@ -1,19 +1,21 @@
 # backup-rsync
 
-Local backup using rsync as a data copier and ZFS datasets as a destination.
+Backup using `rsync` as an engine. 
+
+NOTE: Using rsync in remote mode is not a use case considered for this tool.
+Both the source and destination are local mounted drives, ensuring efficient and direct data transfer.
 
 Go tool used for my own private purposes.
 
 **Use at your own risk!**
 
-## Goals
+## Features
 
-- Have the coverage of paths in the source devices checked for completeness
-- Document the data copy jobs
-- Easily run single jobs on the command line
-- Extensive logging of the operations performed
-- Dry run for checking what would be performed
-- Provide checks for ZFS (snapshot management, size limits reached, ...)
+- The tool checks that all specified source paths are covered, ensuring completeness of backups.
+- Each data copy job is defined and documented in the configuration file.
+- Individual jobs can be executed directly from the command line.
+- All backup operations are extensively logged, including detailed rsync output and job summaries.
+- A dry run mode is available to preview actions without making changes.
 
 ## Configuration File Format (`sync.yaml`)
 
