@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+// Path represents a source or target path with optional exclusions.
+type Path struct {
+	Path       string   `yaml:"path"`
+	Exclusions []string `yaml:"exclusions"`
+}
+
 func NormalizePath(path string) string {
 	return strings.TrimSuffix(strings.ReplaceAll(path, "//", "/"), "/")
 }

@@ -7,123 +7,52 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newMockSyncCommand() SyncCommand {
-	return SyncCommand{
-		SharedCommand: SharedCommand{
-			BinPath: "/usr/bin/rsync",
-			Shell:   &MockExec{},
-		},
+func newJob() Job {
+	return Job{
+		Name:       "job",
+		Source:     "",
+		Target:     "",
+		Delete:     true,
+		Enabled:    true,
+		Exclusions: []string{},
 	}
 }
 
-func newMockSimulateCommand() SimulateCommand {
-	return SimulateCommand{
-		SharedCommand: SharedCommand{
-			BinPath: "/usr/bin/rsync",
-			Shell:   &MockExec{},
-		},
-	}
-}
+func TestApply_DisabledJob_ReturnsSkippedAndRunIsNotCalled(t *testing.T) {
+	mockJobCommand := NewMockJobCommand(t)
 
-func TestApply(t *testing.T) {
-	rsync := newMockSimulateCommand()
+	disabledJob := newJob()
+	disabledJob.Enabled = false
 
-	job := NewJob(
-		WithName("test_job"),
-		WithSource("/home/test/"),
-		WithTarget("/mnt/backup1/test/"),
-		WithExclusions([]string{"*.tmp"}),
-	)
+	// No expectations set - Run should NOT be called for disabled jobs
 
-	status := job.Apply(rsync)
-	assert.Equal(t, Success, status)
-}
-func TestApply_Disabled(t *testing.T) {
-	command := newMockSyncCommand()
+	status := disabledJob.Apply(mockJobCommand)
 
-	disabledJob := NewJob(
-		WithName("disabled_job"),
-		WithSource("/home/disabled/"),
-		WithTarget("/mnt/backup1/disabled/"),
-		WithEnabled(false),
-	)
-
-	status := disabledJob.Apply(command)
 	assert.Equal(t, Skipped, status)
 }
 
-func TestApply_Invalid(t *testing.T) {
-	rsync := newMockSyncCommand()
+func TestApply_JobFailing_RunIsCalledAndReturnsFailure(t *testing.T) {
+	mockJobCommand := NewMockJobCommand(t)
 
-	// Test case for failure (simulate by providing invalid source path)
-	invalidJob := NewJob(
-		WithName("invalid_job"),
-		WithSource("/invalid/source/path"),
-		WithTarget("/mnt/backup1/invalid/"),
-	)
+	job := newJob()
 
-	status := invalidJob.Apply(rsync)
+	// Set expectation that Run will be called and return Failure
+	mockJobCommand.EXPECT().Run(job).Return(Failure).Once()
+
+	status := job.Apply(mockJobCommand)
+
 	assert.Equal(t, Failure, status)
 }
 
-func TestJobSkippedEnabledTrue(t *testing.T) {
-	rsync := newMockSyncCommand()
+func TestApply_JobSucceeds_RunIsCalledAndReturnsSuccess(t *testing.T) {
+	mockJobCommand := NewMockJobCommand(t)
 
-	job := NewJob(
-		WithName("test_job"),
-		WithSource("/home/test/"),
-		WithTarget("/mnt/backup1/test/"),
-	)
+	job := newJob()
 
-	status := job.Apply(rsync)
-	assert.Equal(t, Success, status)
-}
+	// Set expectation that Run will be called and return Success
+	mockJobCommand.EXPECT().Run(job).Return(Success).Once()
 
-func TestJobSkippedEnabledFalse(t *testing.T) {
-	rsync := newMockSyncCommand()
-
-	disabledJob := NewJob(
-		WithName("disabled_job"),
-		WithSource("/home/disabled/"),
-		WithTarget("/mnt/backup1/disabled/"),
-		WithEnabled(false),
-	)
-
-	status := disabledJob.Apply(rsync)
-	assert.Equal(t, Skipped, status)
-}
-
-func TestJobSkippedEnabledOmitted(t *testing.T) {
-	rsync := newMockSyncCommand()
-
-	job := NewJob(
-		WithName("omitted_enabled_job"),
-		WithSource("/home/omitted/"),
-		WithTarget("/mnt/backup1/omitted/"),
-	)
-
-	status := job.Apply(rsync)
-	assert.Equal(t, Success, status)
-}
-
-func TestApplyWithMockedRsync(t *testing.T) {
-	mockExecutor := &MockExec{}
-	rsync := newMockSimulateCommand()
-	rsync.Shell = mockExecutor
-
-	job := NewJob(
-		WithName("test_job"),
-		WithSource("/home/test/"),
-		WithTarget("/mnt/backup1/test/"),
-		WithExclusions([]string{"*.tmp"}),
-	)
-	status := job.Apply(rsync)
+	status := job.Apply(mockJobCommand)
 
 	assert.Equal(t, Success, status)
-	assert.NotEmpty(t, mockExecutor.CapturedCommands)
-
-	cmd := mockExecutor.CapturedCommands[0]
-
-	assert.Equal(t, "/usr/bin/rsync", cmd.Name, "Command name mismatch")
-	assert.Contains(t, cmd.Args, "--dry-run", "Expected --dry-run flag in command arguments")
 }

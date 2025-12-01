@@ -20,6 +20,14 @@ var (
 	ErrOverlappingPath = errors.New("overlapping path detected")
 )
 
+// Config represents the overall backup configuration.
+type Config struct {
+	Sources   []Path            `yaml:"sources"`
+	Targets   []Path            `yaml:"targets"`
+	Variables map[string]string `yaml:"variables"`
+	Jobs      []Job             `yaml:"jobs"`
+}
+
 func (cfg Config) String() string {
 	out, _ := yaml.Marshal(cfg)
 

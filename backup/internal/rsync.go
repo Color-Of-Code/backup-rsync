@@ -10,6 +10,8 @@ import (
 var ErrInvalidRsyncVersion = errors.New("invalid rsync version output")
 var ErrInvalidRsyncPath = errors.New("rsync path must be an absolute path")
 
+const RsyncVersionFlag = "--version"
+
 type SharedCommand struct {
 	BinPath     string
 	BaseLogPath string
@@ -42,7 +44,7 @@ func (c SharedCommand) GetVersionInfo() (string, string, error) {
 		return "", "", fmt.Errorf("%w: \"%s\"", ErrInvalidRsyncPath, rsyncPath)
 	}
 
-	output, err := c.Shell.Execute(c.BinPath, "--version")
+	output, err := c.Shell.Execute(c.BinPath, RsyncVersionFlag)
 	if err != nil {
 		return "", "", fmt.Errorf("error fetching rsync version: %w", err)
 	}

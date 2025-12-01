@@ -1,0 +1,17 @@
+all: false
+dir: '{{.InterfaceDir}}/test'
+filename: mock_{{.InterfaceName | lower}}_test.go
+force-file-write: true
+formatter: goimports
+generate: true
+include-auto-generated: false
+log-level: info
+structname: 'Mock{{.InterfaceName}}'
+pkgname: 'internal_test'
+recursive: false
+template: testify
+packages:
+  backup-rsync/backup/internal:
+    interfaces:
+      Exec:
+      JobCommand:

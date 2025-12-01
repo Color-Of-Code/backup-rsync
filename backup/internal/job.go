@@ -6,6 +6,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Job represents a backup job configuration for a source/target pair.
+//
+//nolint:recvcheck // UnmarshalYAML requires pointer receiver while Apply uses value receiver
+type Job struct {
+	Name       string   `yaml:"name"`
+	Source     string   `yaml:"source"`
+	Target     string   `yaml:"target"`
+	Delete     bool     `yaml:"delete"`
+	Enabled    bool     `yaml:"enabled"`
+	Exclusions []string `yaml:"exclusions,omitempty"`
+}
+
 // JobYAML is a helper struct for proper YAML unmarshaling with defaults.
 type JobYAML struct {
 	Name       string   `yaml:"name"`
@@ -14,63 +26,6 @@ type JobYAML struct {
 	Delete     *bool    `yaml:"delete"`
 	Enabled    *bool    `yaml:"enabled"`
 	Exclusions []string `yaml:"exclusions,omitempty"`
-}
-
-type Option func(*Job)
-
-func NewJob(opts ...Option) Job {
-	// Default values
-	job := &Job{
-		Name:       "job",
-		Source:     "",
-		Target:     "",
-		Delete:     true,
-		Enabled:    true,
-		Exclusions: []string{},
-	}
-
-	// Apply all options (overrides defaults)
-	for _, opt := range opts {
-		opt(job)
-	}
-
-	return *job
-}
-
-func WithDelete(del bool) Option {
-	return func(p *Job) {
-		p.Delete = del
-	}
-}
-
-func WithName(name string) Option {
-	return func(p *Job) {
-		p.Name = name
-	}
-}
-
-func WithSource(source string) Option {
-	return func(p *Job) {
-		p.Source = source
-	}
-}
-
-func WithTarget(target string) Option {
-	return func(p *Job) {
-		p.Target = target
-	}
-}
-
-func WithEnabled(enabled bool) Option {
-	return func(p *Job) {
-		p.Enabled = enabled
-	}
-}
-
-func WithExclusions(exclusions []string) Option {
-	return func(p *Job) {
-		p.Exclusions = exclusions
-	}
 }
 
 func (job Job) Apply(rsync JobCommand) JobStatus {

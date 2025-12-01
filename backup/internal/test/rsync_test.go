@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,11 +16,12 @@ var errCommandNotFound = errors.New("command not found")
 const rsyncPath = "/usr/bin/rsync"
 
 func TestArgumentsForJob(t *testing.T) {
-	job := NewJob(
-		WithSource("/home/user/Music/"),
-		WithTarget("/target/user/music/home"),
-		WithExclusions([]string{"*.tmp", "node_modules/"}),
-	)
+	job := Job{
+		Delete:     true,
+		Source:     "/home/user/Music/",
+		Target:     "/target/user/music/home",
+		Exclusions: []string{"*.tmp", "node_modules/"},
+	}
 	args := ArgumentsForJob(job, "", true)
 
 	expectedArgs := []string{
@@ -32,13 +34,16 @@ func TestArgumentsForJob(t *testing.T) {
 }
 
 func TestGetVersionInfo_Success(t *testing.T) {
+	mockExec := NewMockExec(t)
 	rsync := SharedCommand{
 		BinPath: rsyncPath,
-		Shell: &MockExec{
-			Output: "rsync  version 3.2.3  protocol version 31\n",
-			Error:  nil,
-		},
+		Shell:   mockExec,
 	}
+
+	// Set expectation for Execute call
+	mockExec.EXPECT().Execute(rsyncPath, mock.MatchedBy(func(args []string) bool {
+		return len(args) == 1 && args[0] == RsyncVersionFlag
+	})).Return([]byte("rsync  version 3.2.3  protocol version 31\n"), nil).Once()
 
 	versionInfo, fullpath, err := rsync.GetVersionInfo()
 
@@ -48,13 +53,16 @@ func TestGetVersionInfo_Success(t *testing.T) {
 }
 
 func TestGetVersionInfo_CommandError(t *testing.T) {
+	mockExec := NewMockExec(t)
 	rsync := SharedCommand{
 		BinPath: rsyncPath,
-		Shell: &MockExec{
-			Output: "",
-			Error:  errCommandNotFound,
-		},
+		Shell:   mockExec,
 	}
+
+	// Set expectation for Execute call to return error
+	mockExec.EXPECT().Execute(rsyncPath, mock.MatchedBy(func(args []string) bool {
+		return len(args) == 1 && args[0] == RsyncVersionFlag
+	})).Return(nil, errCommandNotFound).Once()
 
 	versionInfo, fullpath, err := rsync.GetVersionInfo()
 
@@ -64,13 +72,16 @@ func TestGetVersionInfo_CommandError(t *testing.T) {
 }
 
 func TestGetVersionInfo_InvalidOutput(t *testing.T) {
+	mockExec := NewMockExec(t)
 	rsync := SharedCommand{
 		BinPath: rsyncPath,
-		Shell: &MockExec{
-			Output: "invalid output",
-			Error:  nil,
-		},
+		Shell:   mockExec,
 	}
+
+	// Set expectation for Execute call to return invalid output
+	mockExec.EXPECT().Execute(rsyncPath, mock.MatchedBy(func(args []string) bool {
+		return len(args) == 1 && args[0] == RsyncVersionFlag
+	})).Return([]byte("invalid output"), nil).Once()
 
 	versionInfo, fullpath, err := rsync.GetVersionInfo()
 
@@ -80,13 +91,13 @@ func TestGetVersionInfo_InvalidOutput(t *testing.T) {
 }
 
 func TestGetVersionInfo_EmptyPath(t *testing.T) {
+	mockExec := NewMockExec(t)
 	rsync := SharedCommand{
 		BinPath: "",
-		Shell: &MockExec{
-			Output: "",
-			Error:  nil,
-		},
+		Shell:   mockExec,
 	}
+
+	// No expectations set - should fail before calling Execute due to path validation
 
 	versionInfo, fullpath, err := rsync.GetVersionInfo()
 
@@ -97,13 +108,13 @@ func TestGetVersionInfo_EmptyPath(t *testing.T) {
 }
 
 func TestGetVersionInfo_IncompletePath(t *testing.T) {
+	mockExec := NewMockExec(t)
 	rsync := SharedCommand{
 		BinPath: "bin/rsync",
-		Shell: &MockExec{
-			Output: "",
-			Error:  nil,
-		},
+		Shell:   mockExec,
 	}
+
+	// No expectations set - should fail before calling Execute due to path validation
 
 	versionInfo, fullpath, err := rsync.GetVersionInfo()
 
