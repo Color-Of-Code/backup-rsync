@@ -25,8 +25,3 @@ type Job struct {
 	Enabled    bool     `yaml:"enabled"`
 	Exclusions []string `yaml:"exclusions,omitempty"`
 }
-
-type JobCommand interface {
-	Run(job Job) JobStatus
-	GetVersionInfo() (string, string, error)
-}

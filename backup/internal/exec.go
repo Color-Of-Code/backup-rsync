@@ -7,16 +7,15 @@ import (
 	"strings"
 )
 
-// JobRunner interface for executing commands.
-type JobRunner interface {
+type Exec interface {
 	Execute(name string, args ...string) ([]byte, error)
 }
 
-// RealSync implements JobRunner using actual os/exec.
-type RealSync struct{}
+// OsExec implements Exec using actual os/exec.
+type OsExec struct{}
 
 // Execute runs the actual command.
-func (r *RealSync) Execute(name string, args ...string) ([]byte, error) {
+func (r *OsExec) Execute(name string, args ...string) ([]byte, error) {
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, name, args...)
 

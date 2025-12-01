@@ -8,8 +8,8 @@ import (
 // Static error for testing.
 var ErrExitStatus23 = errors.New("exit status 23")
 
-// MockCommandExecutor implements JobRunner for testing.
-type MockCommandExecutor struct {
+// MockExec implements Exec for testing.
+type MockExec struct {
 	CapturedCommands []MockCommand
 	Output           string
 	Error            error
@@ -22,7 +22,7 @@ type MockCommand struct {
 }
 
 // Execute captures the command and simulates execution.
-func (m *MockCommandExecutor) Execute(name string, args ...string) ([]byte, error) {
+func (m *MockExec) Execute(name string, args ...string) ([]byte, error) {
 	m.CapturedCommands = append(m.CapturedCommands, MockCommand{
 		Name: name,
 		Args: append([]string{}, args...), // Make a copy of args

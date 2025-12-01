@@ -16,13 +16,62 @@ type JobYAML struct {
 	Exclusions []string `yaml:"exclusions,omitempty"`
 }
 
-type JobStatus string
+type Option func(*Job)
 
-const (
-	Success JobStatus = "SUCCESS"
-	Failure JobStatus = "FAILURE"
-	Skipped JobStatus = "SKIPPED"
-)
+func NewJob(opts ...Option) Job {
+	// Default values
+	job := &Job{
+		Name:       "job",
+		Source:     "",
+		Target:     "",
+		Delete:     true,
+		Enabled:    true,
+		Exclusions: []string{},
+	}
+
+	// Apply all options (overrides defaults)
+	for _, opt := range opts {
+		opt(job)
+	}
+
+	return *job
+}
+
+func WithDelete(del bool) Option {
+	return func(p *Job) {
+		p.Delete = del
+	}
+}
+
+func WithName(name string) Option {
+	return func(p *Job) {
+		p.Name = name
+	}
+}
+
+func WithSource(source string) Option {
+	return func(p *Job) {
+		p.Source = source
+	}
+}
+
+func WithTarget(target string) Option {
+	return func(p *Job) {
+		p.Target = target
+	}
+}
+
+func WithEnabled(enabled bool) Option {
+	return func(p *Job) {
+		p.Enabled = enabled
+	}
+}
+
+func WithExclusions(exclusions []string) Option {
+	return func(p *Job) {
+		p.Exclusions = exclusions
+	}
+}
 
 func (job Job) Apply(rsync JobCommand) JobStatus {
 	if !job.Enabled {

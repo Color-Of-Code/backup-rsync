@@ -7,14 +7,14 @@ import (
 	"sort"
 	"testing"
 
-	"backup-rsync/backup/internal"
+	. "backup-rsync/backup/internal"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIsExcludedGlobally_PathGloballyExcluded(t *testing.T) {
-	sources := []internal.Path{
+	sources := []Path{
 		{
 			Path:       "/home/data/",
 			Exclusions: []string{"/projects/P1/", "/media/"},
@@ -32,13 +32,13 @@ func TestIsExcludedGlobally_PathGloballyExcluded(t *testing.T) {
 	expectsError := true
 	expectedLog := "Path '/home/data/projects/P1' is globally excluded by '/projects/P1/' in source '/home/data/'"
 
-	result := internal.IsExcludedGlobally(path, sources)
+	result := IsExcludedGlobally(path, sources)
 	assert.Equal(t, expectsError, result)
 	assert.Contains(t, logBuffer.String(), expectedLog)
 }
 
 func TestIsExcludedGlobally_PathNotExcluded(t *testing.T) {
-	sources := []internal.Path{
+	sources := []Path{
 		{
 			Path:       "/home/data/",
 			Exclusions: []string{"/projects/P1/", "/media/"},
@@ -55,12 +55,12 @@ func TestIsExcludedGlobally_PathNotExcluded(t *testing.T) {
 	path := "/home/data/projects/Other"
 	expectsError := false
 
-	result := internal.IsExcludedGlobally(path, sources)
+	result := IsExcludedGlobally(path, sources)
 	assert.Equal(t, expectsError, result)
 }
 
 func TestIsExcludedGlobally_PathExcludedInAnotherSource(t *testing.T) {
-	sources := []internal.Path{
+	sources := []Path{
 		{
 			Path:       "/home/data/",
 			Exclusions: []string{"/projects/P1/", "/media/"},
@@ -78,7 +78,7 @@ func TestIsExcludedGlobally_PathExcludedInAnotherSource(t *testing.T) {
 	expectsError := true
 	expectedLog := "Path '/home/user/cache' is globally excluded by '/cache/' in source '/home/user/'"
 
-	result := internal.IsExcludedGlobally(path, sources)
+	result := IsExcludedGlobally(path, sources)
 	assert.Equal(t, expectsError, result)
 	assert.Contains(t, logBuffer.String(), expectedLog)
 }
@@ -86,7 +86,7 @@ func TestIsExcludedGlobally_PathExcludedInAnotherSource(t *testing.T) {
 func runListUncoveredPathsTest(
 	t *testing.T,
 	fakeFS map[string][]string,
-	cfg internal.Config,
+	cfg Config,
 	expectedUncoveredPaths []string,
 ) {
 	t.Helper()
@@ -103,7 +103,7 @@ func runListUncoveredPathsTest(
 	}
 
 	// Call the function
-	uncoveredPaths := internal.ListUncoveredPaths(fs, cfg)
+	uncoveredPaths := ListUncoveredPaths(fs, cfg)
 
 	// Assertions
 	sort.Strings(uncoveredPaths)
@@ -120,12 +120,12 @@ func TestListUncoveredPathsVariationsAllCovered(t *testing.T) {
 			"/var/log": {"app1", "app2"},
 			"/tmp":     {"cache", "temp"},
 		},
-		internal.Config{
-			Sources: []internal.Path{
+		Config{
+			Sources: []Path{
 				{Path: "/var/log"},
 				{Path: "/tmp"},
 			},
-			Jobs: []internal.Job{
+			Jobs: []Job{
 				{Name: "Job1", Source: "/var/log"},
 				{Name: "Job2", Source: "/tmp"},
 			},
@@ -143,12 +143,12 @@ func TestListUncoveredPathsVariationsOneCoveredOneUncovered(t *testing.T) {
 			"/home/user/cache": {},
 			"/home/user/npm":   {},
 		},
-		internal.Config{
-			Sources: []internal.Path{
+		Config{
+			Sources: []Path{
 				{Path: "/home/data"},
 				{Path: "/home/user"},
 			},
-			Jobs: []internal.Job{
+			Jobs: []Job{
 				{Name: "Job1", Source: "/home/data"},
 			},
 		},
@@ -162,11 +162,11 @@ func TestListUncoveredPathsVariationsUncoveredExcluded(t *testing.T) {
 		map[string][]string{
 			"/home/data": {"projects", "media"},
 		},
-		internal.Config{
-			Sources: []internal.Path{
+		Config{
+			Sources: []Path{
 				{Path: "/home/data", Exclusions: []string{"media"}},
 			},
-			Jobs: []internal.Job{
+			Jobs: []Job{
 				{Name: "Job1", Source: "/home/data/projects"},
 			},
 		},
@@ -183,11 +183,11 @@ func TestListUncoveredPathsVariationsSubfoldersCovered(t *testing.T) {
 			"/home/data/family/me":  {"a"},
 			"/home/data/family/you": {"a"},
 		},
-		internal.Config{
-			Sources: []internal.Path{
+		Config{
+			Sources: []Path{
 				{Path: "/home/data"},
 			},
-			Jobs: []internal.Job{
+			Jobs: []Job{
 				{Name: "JobMe", Source: "/home/data/family/me"},
 				{Name: "JobYou", Source: "/home/data/family/you"},
 			},

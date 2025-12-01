@@ -3,7 +3,7 @@ package internal_test
 import (
 	"testing"
 
-	"backup-rsync/backup/internal"
+	. "backup-rsync/backup/internal"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +20,7 @@ func TestNormalizePath(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := internal.NormalizePath(test.input)
+		result := NormalizePath(test.input)
 		assert.Equal(t, test.expected, result)
 	}
 }

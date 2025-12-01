@@ -1,7 +1,7 @@
 package internal_test
 
 import (
-	"backup-rsync/backup/internal"
+	. "backup-rsync/backup/internal"
 	"errors"
 	"strings"
 	"testing"
@@ -15,12 +15,12 @@ var errCommandNotFound = errors.New("command not found")
 const rsyncPath = "/usr/bin/rsync"
 
 func TestArgumentsForJob(t *testing.T) {
-	job := *NewJob(
+	job := NewJob(
 		WithSource("/home/user/Music/"),
 		WithTarget("/target/user/music/home"),
 		WithExclusions([]string{"*.tmp", "node_modules/"}),
 	)
-	args := internal.ArgumentsForJob(job, "", true)
+	args := ArgumentsForJob(job, "", true)
 
 	expectedArgs := []string{
 		"--dry-run", "-aiv", "--stats", "--delete",
@@ -32,9 +32,9 @@ func TestArgumentsForJob(t *testing.T) {
 }
 
 func TestGetVersionInfo_Success(t *testing.T) {
-	rsync := internal.SyncCommand{
+	rsync := SharedCommand{
 		BinPath: rsyncPath,
-		Executor: &MockCommandExecutor{
+		Shell: &MockExec{
 			Output: "rsync  version 3.2.3  protocol version 31\n",
 			Error:  nil,
 		},
@@ -48,9 +48,9 @@ func TestGetVersionInfo_Success(t *testing.T) {
 }
 
 func TestGetVersionInfo_CommandError(t *testing.T) {
-	rsync := internal.SyncCommand{
+	rsync := SharedCommand{
 		BinPath: rsyncPath,
-		Executor: &MockCommandExecutor{
+		Shell: &MockExec{
 			Output: "",
 			Error:  errCommandNotFound,
 		},
@@ -64,9 +64,9 @@ func TestGetVersionInfo_CommandError(t *testing.T) {
 }
 
 func TestGetVersionInfo_InvalidOutput(t *testing.T) {
-	rsync := internal.SyncCommand{
+	rsync := SharedCommand{
 		BinPath: rsyncPath,
-		Executor: &MockCommandExecutor{
+		Shell: &MockExec{
 			Output: "invalid output",
 			Error:  nil,
 		},
@@ -80,9 +80,9 @@ func TestGetVersionInfo_InvalidOutput(t *testing.T) {
 }
 
 func TestGetVersionInfo_EmptyPath(t *testing.T) {
-	rsync := internal.SyncCommand{
+	rsync := SharedCommand{
 		BinPath: "",
-		Executor: &MockCommandExecutor{
+		Shell: &MockExec{
 			Output: "",
 			Error:  nil,
 		},
@@ -97,9 +97,9 @@ func TestGetVersionInfo_EmptyPath(t *testing.T) {
 }
 
 func TestGetVersionInfo_IncompletePath(t *testing.T) {
-	rsync := internal.SyncCommand{
+	rsync := SharedCommand{
 		BinPath: "bin/rsync",
-		Executor: &MockCommandExecutor{
+		Shell: &MockExec{
 			Output: "",
 			Error:  nil,
 		},

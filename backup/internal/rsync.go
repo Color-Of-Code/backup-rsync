@@ -10,38 +10,22 @@ import (
 var ErrInvalidRsyncVersion = errors.New("invalid rsync version output")
 var ErrInvalidRsyncPath = errors.New("rsync path must be an absolute path")
 
-type SyncCommand struct {
+type SharedCommand struct {
 	BinPath     string
 	BaseLogPath string
 
-	Executor JobRunner
+	Shell Exec
 }
 
-func NewSyncCommand(binPath string, logPath string) SyncCommand {
-	return SyncCommand{
-		BinPath:     binPath,
-		BaseLogPath: logPath,
-		Executor:    &RealSync{},
-	}
-}
-
-func (command SyncCommand) Run(job Job) JobStatus {
-	logPath := fmt.Sprintf("%s/job-%s.log", command.BaseLogPath, job.Name)
-
-	args := ArgumentsForJob(job, logPath, false)
-
-	return command.RunWithArgs(job, args)
-}
-
-func (command SyncCommand) PrintArgs(job Job, args []string) {
+func (c SharedCommand) PrintArgs(job Job, args []string) {
 	fmt.Printf("Job: %s\n", job.Name)
-	fmt.Printf("Command: %s %s\n", command.BinPath, strings.Join(args, " "))
+	fmt.Printf("Command: %s %s\n", c.BinPath, strings.Join(args, " "))
 }
 
-func (command SyncCommand) RunWithArgs(job Job, args []string) JobStatus {
-	command.PrintArgs(job, args)
+func (c SharedCommand) RunWithArgs(job Job, args []string) JobStatus {
+	c.PrintArgs(job, args)
 
-	out, err := command.Executor.Execute(command.BinPath, args...)
+	out, err := c.Shell.Execute(c.BinPath, args...)
 	fmt.Printf("Output:\n%s\n", string(out))
 
 	if err != nil {
@@ -51,57 +35,14 @@ func (command SyncCommand) RunWithArgs(job Job, args []string) JobStatus {
 	return Success
 }
 
-type SimulateCommand struct {
-	SyncCommand
-}
-
-func NewSimulateCommand(binPath string, logPath string) SimulateCommand {
-	return SimulateCommand{
-		SyncCommand: SyncCommand{
-			BinPath:     binPath,
-			BaseLogPath: logPath,
-			Executor:    &RealSync{},
-		},
-	}
-}
-
-func (command SimulateCommand) Run(job Job) JobStatus {
-	logPath := fmt.Sprintf("%s/job-%s.log", command.BaseLogPath, job.Name)
-	args := ArgumentsForJob(job, logPath, true)
-
-	return command.RunWithArgs(job, args)
-}
-
-type ListCommand struct {
-	SyncCommand
-}
-
-func NewListCommand(binPath string) ListCommand {
-	return ListCommand{
-		SyncCommand: SyncCommand{
-			BinPath:     binPath,
-			BaseLogPath: "",
-			Executor:    &RealSync{},
-		},
-	}
-}
-func (command ListCommand) Run(job Job) JobStatus {
-	logPath := fmt.Sprintf("%s/job-%s.log", command.BaseLogPath, job.Name)
-
-	args := ArgumentsForJob(job, logPath, false)
-	command.PrintArgs(job, args)
-
-	return Success
-}
-
-func (command SyncCommand) GetVersionInfo() (string, string, error) {
-	rsyncPath := command.BinPath
+func (c SharedCommand) GetVersionInfo() (string, string, error) {
+	rsyncPath := c.BinPath
 
 	if !filepath.IsAbs(rsyncPath) {
 		return "", "", fmt.Errorf("%w: \"%s\"", ErrInvalidRsyncPath, rsyncPath)
 	}
 
-	output, err := command.Executor.Execute(command.BinPath, "--version")
+	output, err := c.Shell.Execute(c.BinPath, "--version")
 	if err != nil {
 		return "", "", fmt.Errorf("error fetching rsync version: %w", err)
 	}

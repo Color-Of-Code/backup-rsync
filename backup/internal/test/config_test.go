@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
-	"backup-rsync/backup/internal"
+	. "backup-rsync/backup/internal"
 )
 
 func TestLoadConfig1(t *testing.T) {
@@ -24,7 +24,7 @@ jobs:
 `
 	reader := bytes.NewReader([]byte(yamlData))
 
-	cfg, err := internal.LoadConfig(reader)
+	cfg, err := LoadConfig(reader)
 	require.NoError(t, err)
 
 	assert.Equal(t, "/mnt/backup1", cfg.Variables["target_base"])
@@ -51,10 +51,10 @@ jobs:
 
 	reader := bytes.NewReader([]byte(yamlData))
 
-	cfg, err := internal.LoadConfig(reader)
+	cfg, err := LoadConfig(reader)
 	require.NoError(t, err)
 
-	expected := []internal.Job{
+	expected := []Job{
 		{
 			Name:    "job1",
 			Source:  "/source1",
@@ -82,7 +82,7 @@ name: "test_job"
 source: "/source"
 target: "/target"
 `
-	expected := internal.Job{
+	expected := Job{
 		Name:    "test_job",
 		Source:  "/source",
 		Target:  "/target",
@@ -90,7 +90,7 @@ target: "/target"
 		Enabled: true,
 	}
 
-	var job internal.Job
+	var job Job
 
 	err := yaml.Unmarshal([]byte(yamlData), &job)
 	require.NoError(t, err)
@@ -105,7 +105,7 @@ target: "/target"
 delete: false
 enabled: false
 `
-	expected := internal.Job{
+	expected := Job{
 		Name:    "test_job",
 		Source:  "/source",
 		Target:  "/target",
@@ -113,7 +113,7 @@ enabled: false
 		Enabled: false,
 	}
 
-	var job internal.Job
+	var job Job
 
 	err := yaml.Unmarshal([]byte(yamlData), &job)
 	require.NoError(t, err)
@@ -127,7 +127,7 @@ source: "/source"
 target: "/target"
 delete: false
 `
-	expected := internal.Job{
+	expected := Job{
 		Name:    "test_job",
 		Source:  "/source",
 		Target:  "/target",
@@ -135,7 +135,7 @@ delete: false
 		Enabled: true, // default
 	}
 
-	var job internal.Job
+	var job Job
 
 	err := yaml.Unmarshal([]byte(yamlData), &job)
 	require.NoError(t, err)
@@ -149,49 +149,49 @@ func TestSubstituteVariables(t *testing.T) {
 	input := "${target_base}/user/music/home"
 	expected := "/mnt/backup1/user/music/home"
 
-	result := internal.SubstituteVariables(input, variables)
+	result := SubstituteVariables(input, variables)
 	assert.Equal(t, expected, result, "SubstituteVariables result mismatch")
 }
 
 func TestValidateJobNames_ValidJobNames(t *testing.T) {
-	jobs := []internal.Job{
+	jobs := []Job{
 		{Name: "job1"},
 		{Name: "job2"},
 	}
 
-	err := internal.ValidateJobNames(jobs)
+	err := ValidateJobNames(jobs)
 	assert.NoError(t, err)
 }
 
 func TestValidateJobNames_DuplicateJobNames(t *testing.T) {
-	jobs := []internal.Job{
+	jobs := []Job{
 		{Name: "job1"},
 		{Name: "job1"},
 	}
 
-	err := internal.ValidateJobNames(jobs)
+	err := ValidateJobNames(jobs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate job name: job1")
 }
 
 func TestValidateJobNames_InvalidCharactersInJobName(t *testing.T) {
-	jobs := []internal.Job{
+	jobs := []Job{
 		{Name: "job 1"},
 	}
 
-	err := internal.ValidateJobNames(jobs)
+	err := ValidateJobNames(jobs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid characters in job name: job 1")
 }
 
 func TestValidateJobNames_MixedErrors(t *testing.T) {
-	jobs := []internal.Job{
+	jobs := []Job{
 		{Name: "job1"},
 		{Name: "job 1"},
 		{Name: "job1"},
 	}
 
-	err := internal.ValidateJobNames(jobs)
+	err := ValidateJobNames(jobs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate job name: job1")
 }
@@ -199,15 +199,15 @@ func TestValidateJobNames_MixedErrors(t *testing.T) {
 func TestValidatePath_ValidSourcePath(t *testing.T) {
 	test := struct {
 		jobPath  string
-		paths    []internal.Path
+		paths    []Path
 		pathType string
 	}{
 		jobPath:  "/home/user/documents",
-		paths:    []internal.Path{{Path: "/home/user"}},
+		paths:    []Path{{Path: "/home/user"}},
 		pathType: "source",
 	}
 
-	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
+	err := ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
 
 	assert.NoError(t, err)
 }
@@ -215,15 +215,15 @@ func TestValidatePath_ValidSourcePath(t *testing.T) {
 func TestValidatePath_InvalidSourcePath(t *testing.T) {
 	test := struct {
 		jobPath  string
-		paths    []internal.Path
+		paths    []Path
 		pathType string
 	}{
 		jobPath:  "/invalid/source",
-		paths:    []internal.Path{{Path: "/home/user"}},
+		paths:    []Path{{Path: "/home/user"}},
 		pathType: "source",
 	}
 
-	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
+	err := ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
 
 	require.Error(t, err)
 	assert.EqualError(t, err, "invalid path for job 'job1': source /invalid/source")
@@ -232,15 +232,15 @@ func TestValidatePath_InvalidSourcePath(t *testing.T) {
 func TestValidatePath_ValidTargetPath(t *testing.T) {
 	test := struct {
 		jobPath  string
-		paths    []internal.Path
+		paths    []Path
 		pathType string
 	}{
 		jobPath:  "/mnt/backup/documents",
-		paths:    []internal.Path{{Path: "/mnt/backup"}},
+		paths:    []Path{{Path: "/mnt/backup"}},
 		pathType: "target",
 	}
 
-	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
+	err := ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
 
 	assert.NoError(t, err)
 }
@@ -248,15 +248,15 @@ func TestValidatePath_ValidTargetPath(t *testing.T) {
 func TestValidatePath_InvalidTargetPath(t *testing.T) {
 	test := struct {
 		jobPath  string
-		paths    []internal.Path
+		paths    []Path
 		pathType string
 	}{
 		jobPath:  "/invalid/target",
-		paths:    []internal.Path{{Path: "/mnt/backup"}},
+		paths:    []Path{{Path: "/mnt/backup"}},
 		pathType: "target",
 	}
 
-	err := internal.ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
+	err := ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
 
 	require.Error(t, err)
 	assert.EqualError(t, err, "invalid path for job 'job1': target /invalid/target")
@@ -265,25 +265,25 @@ func TestValidatePath_InvalidTargetPath(t *testing.T) {
 func TestValidatePaths_ValidPaths(t *testing.T) {
 	test := struct {
 		name         string
-		cfg          internal.Config
+		cfg          Config
 		expectsError bool
 	}{
 		name: "Valid paths",
-		cfg: internal.Config{
-			Sources: []internal.Path{
+		cfg: Config{
+			Sources: []Path{
 				{Path: "/home/user"},
 			},
-			Targets: []internal.Path{
+			Targets: []Path{
 				{Path: "/mnt/backup"},
 			},
-			Jobs: []internal.Job{
+			Jobs: []Job{
 				{Name: "job1", Source: "/home/user/documents", Target: "/mnt/backup/documents"},
 			},
 		},
 	}
 
 	t.Run(test.name, func(t *testing.T) {
-		err := internal.ValidatePaths(test.cfg)
+		err := ValidatePaths(test.cfg)
 		assert.NoError(t, err)
 	})
 }
@@ -291,19 +291,19 @@ func TestValidatePaths_ValidPaths(t *testing.T) {
 func TestValidatePaths_InvalidPaths(t *testing.T) {
 	test := struct {
 		name         string
-		cfg          internal.Config
+		cfg          Config
 		expectsError bool
 		errorMessage string
 	}{
 		name: "Invalid paths",
-		cfg: internal.Config{
-			Sources: []internal.Path{
+		cfg: Config{
+			Sources: []Path{
 				{Path: "/home/user"},
 			},
-			Targets: []internal.Path{
+			Targets: []Path{
 				{Path: "/mnt/backup"},
 			},
-			Jobs: []internal.Job{
+			Jobs: []Job{
 				{Name: "job1", Source: "/invalid/source", Target: "/invalid/target"},
 			},
 		},
@@ -313,18 +313,18 @@ func TestValidatePaths_InvalidPaths(t *testing.T) {
 	}
 
 	t.Run(test.name, func(t *testing.T) {
-		err := internal.ValidatePaths(test.cfg)
+		err := ValidatePaths(test.cfg)
 		require.Error(t, err)
 		assert.EqualError(t, err, test.errorMessage)
 	})
 }
 
 func TestConfigString_ValidConfig(t *testing.T) {
-	cfg := internal.Config{
-		Sources:   []internal.Path{},
-		Targets:   []internal.Path{},
+	cfg := Config{
+		Sources:   []Path{},
+		Targets:   []Path{},
 		Variables: map[string]string{},
-		Jobs:      []internal.Job{},
+		Jobs:      []Job{},
 	}
 
 	expectedOutput := "sources: []\ntargets: []\nvariables: {}\njobs: []\n"
