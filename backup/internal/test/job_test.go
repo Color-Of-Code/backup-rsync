@@ -7,8 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const statusSuccess = "SUCCESS"
-
 type Option func(*internal.Job)
 
 func NewJob(opts ...Option) *internal.Job {
@@ -87,7 +85,7 @@ func TestApply(t *testing.T) {
 	)
 
 	status := job.Apply(rsync)
-	assert.Equal(t, statusSuccess, status)
+	assert.Equal(t, internal.Success, status)
 }
 func TestApply_Disabled(t *testing.T) {
 	command := newMockSyncCommand()
@@ -100,7 +98,7 @@ func TestApply_Disabled(t *testing.T) {
 	)
 
 	status := disabledJob.Apply(command)
-	assert.Equal(t, "SKIPPED", status)
+	assert.Equal(t, internal.Skipped, status)
 }
 
 func TestApply_Invalid(t *testing.T) {
@@ -114,7 +112,7 @@ func TestApply_Invalid(t *testing.T) {
 	)
 
 	status := invalidJob.Apply(rsync)
-	assert.Equal(t, "FAILURE", status)
+	assert.Equal(t, internal.Failure, status)
 }
 
 func TestJobSkippedEnabledTrue(t *testing.T) {
@@ -127,7 +125,7 @@ func TestJobSkippedEnabledTrue(t *testing.T) {
 	)
 
 	status := job.Apply(rsync)
-	assert.Equal(t, statusSuccess, status)
+	assert.Equal(t, internal.Success, status)
 }
 
 func TestJobSkippedEnabledFalse(t *testing.T) {
@@ -141,7 +139,7 @@ func TestJobSkippedEnabledFalse(t *testing.T) {
 	)
 
 	status := disabledJob.Apply(rsync)
-	assert.Equal(t, "SKIPPED", status)
+	assert.Equal(t, internal.Skipped, status)
 }
 
 func TestJobSkippedEnabledOmitted(t *testing.T) {
@@ -154,7 +152,7 @@ func TestJobSkippedEnabledOmitted(t *testing.T) {
 	)
 
 	status := job.Apply(rsync)
-	assert.Equal(t, statusSuccess, status)
+	assert.Equal(t, internal.Success, status)
 }
 
 func TestApplyWithMockedRsync(t *testing.T) {
@@ -170,7 +168,7 @@ func TestApplyWithMockedRsync(t *testing.T) {
 	)
 	status := job.Apply(rsync)
 
-	assert.Equal(t, statusSuccess, status)
+	assert.Equal(t, internal.Success, status)
 	assert.NotEmpty(t, mockExecutor.CapturedCommands)
 
 	cmd := mockExecutor.CapturedCommands[0]

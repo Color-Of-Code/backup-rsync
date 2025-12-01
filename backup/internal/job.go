@@ -16,9 +16,17 @@ type JobYAML struct {
 	Exclusions []string `yaml:"exclusions,omitempty"`
 }
 
-func (job Job) Apply(rsync JobCommand) string {
+type JobStatus string
+
+const (
+	Success JobStatus = "SUCCESS"
+	Failure JobStatus = "FAILURE"
+	Skipped JobStatus = "SKIPPED"
+)
+
+func (job Job) Apply(rsync JobCommand) JobStatus {
 	if !job.Enabled {
-		return "SKIPPED"
+		return Skipped
 	}
 
 	return rsync.Run(job)

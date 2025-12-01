@@ -25,7 +25,7 @@ func NewSyncCommand(binPath string, logPath string) SyncCommand {
 	}
 }
 
-func (command SyncCommand) Run(job Job) string {
+func (command SyncCommand) Run(job Job) JobStatus {
 	logPath := fmt.Sprintf("%s/job-%s.log", command.BaseLogPath, job.Name)
 
 	args := ArgumentsForJob(job, logPath, false)
@@ -38,17 +38,17 @@ func (command SyncCommand) PrintArgs(job Job, args []string) {
 	fmt.Printf("Command: %s %s\n", command.BinPath, strings.Join(args, " "))
 }
 
-func (command SyncCommand) RunWithArgs(job Job, args []string) string {
+func (command SyncCommand) RunWithArgs(job Job, args []string) JobStatus {
 	command.PrintArgs(job, args)
 
 	out, err := command.Executor.Execute(command.BinPath, args...)
 	fmt.Printf("Output:\n%s\n", string(out))
 
 	if err != nil {
-		return "FAILURE"
+		return Failure
 	}
 
-	return "SUCCESS"
+	return Success
 }
 
 type SimulateCommand struct {
@@ -65,9 +65,8 @@ func NewSimulateCommand(binPath string, logPath string) SimulateCommand {
 	}
 }
 
-func (command SimulateCommand) Run(job Job) string {
+func (command SimulateCommand) Run(job Job) JobStatus {
 	logPath := fmt.Sprintf("%s/job-%s.log", command.BaseLogPath, job.Name)
-
 	args := ArgumentsForJob(job, logPath, true)
 
 	return command.RunWithArgs(job, args)
@@ -86,13 +85,13 @@ func NewListCommand(binPath string) ListCommand {
 		},
 	}
 }
-func (command ListCommand) Run(job Job) string {
+func (command ListCommand) Run(job Job) JobStatus {
 	logPath := fmt.Sprintf("%s/job-%s.log", command.BaseLogPath, job.Name)
 
 	args := ArgumentsForJob(job, logPath, false)
 	command.PrintArgs(job, args)
 
-	return "SUCCESS"
+	return Success
 }
 
 func (command SyncCommand) GetVersionInfo() (string, string, error) {

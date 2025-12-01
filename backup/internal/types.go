@@ -27,6 +27,6 @@ type Job struct {
 }
 
 type JobCommand interface {
-	Run(job Job) string
+	Run(job Job) JobStatus
 	GetVersionInfo() (string, string, error)
 }
