@@ -24,3 +24,15 @@ func TestNormalizePath(t *testing.T) {
 		assert.Equal(t, test.expected, result)
 	}
 }
+
+func TestCreateMainLogger_IsSimulate_HasSimSuffix(t *testing.T) {
+	logger, logPath := CreateMainLogger(true)
+	assert.Contains(t, logPath, "-sim")
+	assert.NotNil(t, logger, "Logger should not be nil")
+}
+
+func TestCreateMainLogger_NotSimulate_HasNoSimSuffix(t *testing.T) {
+	logger, logPath := CreateMainLogger(false)
+	assert.NotContains(t, logPath, "-sim")
+	assert.NotNil(t, logger, "Logger should not be nil")
+}

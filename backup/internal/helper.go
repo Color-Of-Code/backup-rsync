@@ -21,8 +21,11 @@ func NormalizePath(path string) string {
 const LogFilePermission = 0644
 const LogDirPermission = 0755
 
-func getLogPath() string {
+func getLogPath(simulate bool) string {
 	logPath := "logs/sync-" + time.Now().Format("2006-01-02T15-04-05")
+	if simulate {
+		logPath += "-sim"
+	}
 
 	err := os.MkdirAll(logPath, LogDirPermission)
 	if err != nil {
@@ -32,8 +35,8 @@ func getLogPath() string {
 	return logPath
 }
 
-func CreateMainLogger() (*log.Logger, string) {
-	logPath := getLogPath()
+func CreateMainLogger(simulate bool) (*log.Logger, string) {
+	logPath := getLogPath(simulate)
 
 	overallLogPath := logPath + "/summary.log"
 
