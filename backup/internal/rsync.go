@@ -3,6 +3,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -29,6 +30,26 @@ func (c SharedCommand) RunWithArgs(job Job, args []string) JobStatus {
 
 	out, err := c.Shell.Execute(c.BinPath, args...)
 	fmt.Printf("Output:\n%s\n", string(out))
+
+	if err != nil {
+		return Failure
+	}
+
+	return Success
+}
+
+func (c SharedCommand) RunWithArgsAndCaptureOutput(job Job, args []string, logPath string) JobStatus {
+	c.PrintArgs(job, args)
+
+	out, err := c.Shell.Execute(c.BinPath, args...)
+
+	// Write output to log file for simulate commands
+	if logPath != "" {
+		writeErr := os.WriteFile(logPath, out, LogFilePermission)
+		if writeErr != nil {
+			fmt.Printf("Warning: Failed to write output to log file %s: %v\n", logPath, writeErr)
+		}
+	}
 
 	if err != nil {
 		return Failure

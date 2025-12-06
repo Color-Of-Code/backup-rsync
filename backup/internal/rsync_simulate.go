@@ -20,7 +20,8 @@ func NewSimulateCommand(binPath string, logPath string) SimulateCommand {
 
 func (c SimulateCommand) Run(job Job) JobStatus {
 	logPath := fmt.Sprintf("%s/job-%s.log", c.BaseLogPath, job.Name)
-	args := ArgumentsForJob(job, logPath, true)
+	// Don't use --log-file in simulate mode as rsync doesn't log file changes to it in dry-run
+	args := ArgumentsForJob(job, "", true)
 
-	return c.RunWithArgs(job, args)
+	return c.RunWithArgsAndCaptureOutput(job, args, logPath)
 }
