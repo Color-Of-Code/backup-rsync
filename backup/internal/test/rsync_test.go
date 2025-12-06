@@ -123,3 +123,12 @@ func TestGetVersionInfo_IncompletePath(t *testing.T) {
 	assert.Empty(t, versionInfo)
 	assert.Empty(t, fullpath)
 }
+
+func TestNewSimulateCommand_BaseLogPath_ShallHaveSimSuffix(t *testing.T) {
+	binPath := "/usr/bin/simulate"
+	logPath := "/var/log/simulate"
+
+	simulateCmd := NewSimulateCommand(binPath, logPath)
+
+	assert.Equal(t, logPath+"-sim", simulateCmd.BaseLogPath)
+}

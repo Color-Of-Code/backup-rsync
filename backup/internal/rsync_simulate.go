@@ -12,7 +12,7 @@ func NewSimulateCommand(binPath string, logPath string) SimulateCommand {
 	return SimulateCommand{
 		SharedCommand: SharedCommand{
 			BinPath:     binPath,
-			BaseLogPath: logPath,
+			BaseLogPath: logPath + "-sim",
 			Shell:       &OsExec{},
 		},
 	}
