@@ -25,14 +25,20 @@ func TestNormalizePath(t *testing.T) {
 	}
 }
 
+func TestCreateMainLogger_Title_IsPresent(t *testing.T) {
+	logger, logPath := CreateMainLogger("title", true)
+	assert.Contains(t, logPath, "title")
+	assert.NotNil(t, logger, "Logger should not be nil")
+}
+
 func TestCreateMainLogger_IsSimulate_HasSimSuffix(t *testing.T) {
-	logger, logPath := CreateMainLogger(true)
+	logger, logPath := CreateMainLogger("", true)
 	assert.Contains(t, logPath, "-sim")
 	assert.NotNil(t, logger, "Logger should not be nil")
 }
 
 func TestCreateMainLogger_NotSimulate_HasNoSimSuffix(t *testing.T) {
-	logger, logPath := CreateMainLogger(false)
+	logger, logPath := CreateMainLogger("", false)
 	assert.NotContains(t, logPath, "-sim")
 	assert.NotNil(t, logger, "Logger should not be nil")
 }

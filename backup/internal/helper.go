@@ -4,6 +4,7 @@ package internal
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -14,6 +15,13 @@ type Path struct {
 	Exclusions []string `yaml:"exclusions"`
 }
 
+func GetConfigTitle(configPath string) string {
+	filename := filepath.Base(configPath)
+	filename = strings.TrimSuffix(filename, ".yaml")
+
+	return filename
+}
+
 func NormalizePath(path string) string {
 	return strings.TrimSuffix(strings.ReplaceAll(path, "//", "/"), "/")
 }
@@ -21,8 +29,8 @@ func NormalizePath(path string) string {
 const LogFilePermission = 0644
 const LogDirPermission = 0755
 
-func getLogPath(simulate bool) string {
-	logPath := "logs/sync-" + time.Now().Format("2006-01-02T15-04-05")
+func getLogPath(simulate bool, title string) string {
+	logPath := "logs/sync-" + time.Now().Format("2006-01-02T15-04-05") + "-" + GetConfigTitle(title)
 	if simulate {
 		logPath += "-sim"
 	}
@@ -35,8 +43,8 @@ func getLogPath(simulate bool) string {
 	return logPath
 }
 
-func CreateMainLogger(simulate bool) (*log.Logger, string) {
-	logPath := getLogPath(simulate)
+func CreateMainLogger(configPath string, simulate bool) (*log.Logger, string) {
+	logPath := getLogPath(simulate, configPath)
 
 	overallLogPath := logPath + "/summary.log"
 
