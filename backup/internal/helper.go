@@ -15,13 +15,6 @@ type Path struct {
 	Exclusions []string `yaml:"exclusions"`
 }
 
-func GetConfigTitle(configPath string) string {
-	filename := filepath.Base(configPath)
-	filename = strings.TrimSuffix(filename, ".yaml")
-
-	return filename
-}
-
 func NormalizePath(path string) string {
 	return strings.TrimSuffix(strings.ReplaceAll(path, "//", "/"), "/")
 }
@@ -29,15 +22,13 @@ func NormalizePath(path string) string {
 const LogFilePermission = 0644
 const LogDirPermission = 0755
 
-func getLogPath(simulate bool, title string) string {
-	logPath := "logs/sync-" + time.Now().Format("2006-01-02T15-04-05") + "-" + GetConfigTitle(title)
+func getLogPath(simulate bool, configPath string) string {
+	filename := filepath.Base(configPath)
+	filename = strings.TrimSuffix(filename, ".yaml")
+	logPath := "logs/sync-" + time.Now().Format("2006-01-02T15-04-05") + "-" + filename
+
 	if simulate {
 		logPath += "-sim"
-	}
-
-	err := os.MkdirAll(logPath, LogDirPermission)
-	if err != nil {
-		log.Fatalf("Failed to create log directory: %v", err)
 	}
 
 	return logPath
@@ -45,8 +36,12 @@ func getLogPath(simulate bool, title string) string {
 
 func CreateMainLogger(configPath string, simulate bool) (*log.Logger, string) {
 	logPath := getLogPath(simulate, configPath)
-
 	overallLogPath := logPath + "/summary.log"
+
+	err := os.MkdirAll(logPath, LogDirPermission)
+	if err != nil {
+		log.Fatalf("Failed to create log directory: %v", err)
+	}
 
 	overallLogFile, err := os.OpenFile(overallLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, LogFilePermission)
 	if err != nil {

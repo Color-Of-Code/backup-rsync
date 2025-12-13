@@ -42,3 +42,17 @@ func TestCreateMainLogger_NotSimulate_HasNoSimSuffix(t *testing.T) {
 	assert.NotContains(t, logPath, "-sim")
 	assert.NotNil(t, logger)
 }
+
+func TestCreateLogPath_IsSimulate_ContainsTimestamp(t *testing.T) {
+	_, logPath := CreateMainLogger("", true)
+	// Check if the logPath contains a timestamp in the format '2006-01-02T15-04-05'
+	timestampRegex := `\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}`
+	assert.Regexp(t, timestampRegex, logPath)
+}
+
+func TestCreateLogPath_NotSimulate_ContainsTimestamp(t *testing.T) {
+	_, logPath := CreateMainLogger("", false)
+	// Check if the logPath contains a timestamp in the format '2006-01-02T15-04-05'
+	timestampRegex := `\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}`
+	assert.Regexp(t, timestampRegex, logPath)
+}
