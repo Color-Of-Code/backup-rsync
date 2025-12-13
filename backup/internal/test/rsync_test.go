@@ -33,6 +33,25 @@ func TestArgumentsForJob(t *testing.T) {
 	assert.Equal(t, strings.Join(expectedArgs, " "), strings.Join(args, " "))
 }
 
+func TestArgumentsForJob_WithLogPath_(t *testing.T) {
+	job := Job{
+		Delete:     false,
+		Source:     "/home/user/Documents/",
+		Target:     "/backup/user/documents",
+		Exclusions: []string{"*.log", "temp/"},
+	}
+	args := ArgumentsForJob(job, "/var/log/rsync.log", false)
+
+	expectedArgs := []string{
+		"-aiv", "--stats",
+		"--log-file=/var/log/rsync.log",
+		"--exclude=*.log", "--exclude=temp/",
+		"/home/user/Documents/", "/backup/user/documents",
+	}
+
+	assert.Equal(t, strings.Join(expectedArgs, " "), strings.Join(args, " "))
+}
+
 func TestGetVersionInfo_Success(t *testing.T) {
 	mockExec := NewMockExec(t)
 	rsync := SharedCommand{
