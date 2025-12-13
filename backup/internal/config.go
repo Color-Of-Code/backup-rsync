@@ -72,7 +72,7 @@ func SubstituteVariables(input string, variables map[string]string) string {
 	return input
 }
 
-func resolveConfig(cfg Config) Config {
+func ResolveConfig(cfg Config) Config {
 	resolvedCfg := cfg
 	for i, job := range resolvedCfg.Jobs {
 		resolvedCfg.Jobs[i].Source = SubstituteVariables(job.Source, cfg.Variables)
@@ -191,7 +191,7 @@ func LoadResolvedConfig(configPath string) Config {
 		log.Fatalf("Job validation failed: %v", err)
 	}
 
-	resolvedCfg := resolveConfig(cfg)
+	resolvedCfg := ResolveConfig(cfg)
 
 	err = ValidatePaths(resolvedCfg)
 	if err != nil {

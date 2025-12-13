@@ -332,3 +332,31 @@ func TestConfigString_ValidConfig(t *testing.T) {
 
 	assert.Equal(t, expectedOutput, actualOutput)
 }
+
+func TestResolveConfig(t *testing.T) {
+	cfg := Config{
+		Variables: map[string]string{
+			"source_base": "/home/user",
+			"target_base": "/backup/user",
+		},
+		Jobs: []Job{
+			{
+				Name:   "job1",
+				Source: "${source_base}/Documents",
+				Target: "${target_base}/Documents",
+			},
+			{
+				Name:   "job2",
+				Source: "${source_base}/Pictures",
+				Target: "${target_base}/Pictures",
+			},
+		},
+	}
+
+	resolvedCfg := ResolveConfig(cfg)
+
+	assert.Equal(t, "/home/user/Documents", resolvedCfg.Jobs[0].Source)
+	assert.Equal(t, "/backup/user/Documents", resolvedCfg.Jobs[0].Target)
+	assert.Equal(t, "/home/user/Pictures", resolvedCfg.Jobs[1].Source)
+	assert.Equal(t, "/backup/user/Pictures", resolvedCfg.Jobs[1].Target)
+}
