@@ -33,7 +33,7 @@ sanity-check: format check-clean check-mod-tidy
 	@echo "OK: All sanity checks passed."
 
 test:
-	go test ./... -v
+	go test -race ./... -v
 
 tidy:
 	gofmt -s -w .
