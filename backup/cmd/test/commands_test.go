@@ -237,8 +237,9 @@ jobs:
     enabled: true
 `)
 
-	// list doesn't call rsync, it just prints job info
-	_, err := executeCommand(t, "list", "--config", cfgPath)
+	stdout, err := executeCommand(t, "list", "--config", cfgPath)
 
 	require.NoError(t, err)
+	assert.Contains(t, stdout, "Job: docs")
+	assert.Contains(t, stdout, "Status [docs]: SUCCESS")
 }
