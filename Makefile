@@ -5,7 +5,7 @@ BUILD_CMD = CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -tags=prod
 PACKAGE = ./backup/main.go
 COVERAGE_THRESHOLD = 98
 
-.PHONY: build clean test lint tidy checksums release sanity-check check-mod-tidy lint-config-check  lint-fix format check-clean check-coverage
+.PHONY: build clean test test-integration lint tidy checksums release sanity-check check-mod-tidy lint-config-check  lint-fix format check-clean check-coverage
 
 format:
 	go fmt ./...
@@ -35,6 +35,9 @@ sanity-check: format check-clean check-mod-tidy
 
 test:
 	go test -race ./... -v
+
+test-integration:
+	go test -race -tags=integration ./... -v
 
 tidy:
 	gofmt -s -w .
