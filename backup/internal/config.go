@@ -153,7 +153,6 @@ func validateJobPaths(jobs []Job, pathType string, getPath func(job Job) string)
 				if pathType == "source" {
 					for _, exclusion := range job2.Exclusions {
 						exclusionPath := NormalizePath(filepath.Join(job2.Source, exclusion))
-						// log.Printf("job2: %s %s\n", job2.Name, exclusionPath)
 						if strings.HasPrefix(path1, exclusionPath) {
 							excluded = true
 
