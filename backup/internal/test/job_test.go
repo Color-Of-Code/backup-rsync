@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func newJob() Job {
@@ -55,4 +57,19 @@ func TestApply_JobSucceeds_RunIsCalledAndReturnsSuccess(t *testing.T) {
 	status := job.Apply(mockJobCommand)
 
 	assert.Equal(t, Success, status)
+}
+
+func TestUnmarshalYAML_InvalidNode(t *testing.T) {
+	// A scalar node cannot be decoded into the JobYAML struct
+	node := &yaml.Node{
+		Kind:  yaml.ScalarNode,
+		Value: "not a mapping",
+	}
+
+	var job Job
+
+	err := node.Decode(&job)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to decode YAML node")
 }

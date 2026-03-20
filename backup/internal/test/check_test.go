@@ -281,3 +281,57 @@ func TestListUncoveredPaths_UnreadableDirectory(t *testing.T) {
 	assert.Equal(t, []string{"/data"}, result)
 	assert.Contains(t, logBuf.String(), "ADD: Path '/data' is uncovered")
 }
+
+// Test that a child path matching a job exclusion is marked as excluded
+// (covers isExcluded true + isCoveredByJob excluded log).
+func TestListUncoveredPaths_ChildPathExcludedByJob(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	_ = fs.MkdirAll("/data/stuff/docs", 0755)
+	_ = fs.MkdirAll("/data/stuff/cache", 0755)
+
+	var logBuf bytes.Buffer
+
+	checker := newTestChecker(fs, &logBuf)
+
+	cfg := Config{
+		Sources: []Path{
+			{Path: "/data/stuff"},
+		},
+		Jobs: []Job{
+			// Source "/data" with exclusion "stuff/cache" so exclusionPath = "/data/stuff/cache"
+			{Name: "data-backup", Source: "/data", Exclusions: []string{"stuff/cache"}},
+			// Covers the /data/stuff/docs child directly
+			{Name: "docs", Source: "/data/stuff/docs"},
+		},
+	}
+
+	result := checker.ListUncoveredPaths(cfg)
+
+	assert.Empty(t, result)
+	assert.Contains(t, logBuf.String(), "EXCLUDED: Path '/data/stuff/cache' is excluded by job 'data-backup'")
+}
+
+// Test that a source path that is globally excluded is skipped in checkPath.
+func TestListUncoveredPaths_GloballyExcludedSourceSkipped(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	_ = fs.MkdirAll("/data/cache", 0755)
+
+	var logBuf bytes.Buffer
+
+	checker := newTestChecker(fs, &logBuf)
+
+	cfg := Config{
+		Sources: []Path{
+			{Path: "/data", Exclusions: []string{"cache"}},
+			{Path: "/data/cache"},
+		},
+		Jobs: []Job{
+			{Name: "backup", Source: "/data"},
+		},
+	}
+
+	result := checker.ListUncoveredPaths(cfg)
+
+	assert.Empty(t, result)
+	assert.Contains(t, logBuf.String(), "SKIP: Path '/data/cache' is globally excluded")
+}

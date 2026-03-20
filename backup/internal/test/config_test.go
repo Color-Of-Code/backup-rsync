@@ -452,6 +452,50 @@ jobs:
 	assert.Contains(t, err.Error(), "job source path validation failed")
 }
 
+func TestLoadResolvedConfig_OverlappingSourcePathsAllowedByExclusion(t *testing.T) {
+	yaml := `
+sources:
+  - path: "/home"
+targets:
+  - path: "/backup"
+jobs:
+  - name: "parent"
+    source: "/home/user"
+    target: "/backup/user"
+    exclusions:
+      - "docs"
+  - name: "child"
+    source: "/home/user/docs"
+    target: "/backup/docs"
+`
+	path := writeTestConfig(t, yaml)
+
+	cfg, err := LoadResolvedConfig(path)
+	require.NoError(t, err)
+	assert.Len(t, cfg.Jobs, 2)
+}
+
+func TestLoadResolvedConfig_OverlappingTargetPaths(t *testing.T) {
+	yaml := `
+sources:
+  - path: "/home"
+targets:
+  - path: "/backup"
+jobs:
+  - name: "job1"
+    source: "/home/docs"
+    target: "/backup/all"
+  - name: "job2"
+    source: "/home/photos"
+    target: "/backup/all/photos"
+`
+	path := writeTestConfig(t, yaml)
+
+	_, err := LoadResolvedConfig(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "job target path validation failed")
+}
+
 func TestLoadResolvedConfig_ValidConfig(t *testing.T) {
 	yaml := `
 sources:
