@@ -6,6 +6,7 @@ import (
 	. "backup-rsync/backup/internal"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNormalizePath(t *testing.T) {
@@ -26,32 +27,37 @@ func TestNormalizePath(t *testing.T) {
 }
 
 func TestCreateMainLogger_Title_IsPresent(t *testing.T) {
-	logger, logPath := CreateMainLogger("title", true)
+	logger, logPath, err := CreateMainLogger("title", true)
+	require.NoError(t, err)
 	assert.Contains(t, logPath, "title")
 	assert.NotNil(t, logger)
 }
 
 func TestCreateMainLogger_IsSimulate_HasSimSuffix(t *testing.T) {
-	logger, logPath := CreateMainLogger("", true)
+	logger, logPath, err := CreateMainLogger("", true)
+	require.NoError(t, err)
 	assert.Contains(t, logPath, "-sim")
 	assert.NotNil(t, logger)
 }
 
 func TestCreateMainLogger_NotSimulate_HasNoSimSuffix(t *testing.T) {
-	logger, logPath := CreateMainLogger("", false)
+	logger, logPath, err := CreateMainLogger("", false)
+	require.NoError(t, err)
 	assert.NotContains(t, logPath, "-sim")
 	assert.NotNil(t, logger)
 }
 
 func TestCreateLogPath_IsSimulate_ContainsTimestamp(t *testing.T) {
-	_, logPath := CreateMainLogger("", true)
+	_, logPath, err := CreateMainLogger("", true)
+	require.NoError(t, err)
 	// Check if the logPath contains a timestamp in the format '2006-01-02T15-04-05'
 	timestampRegex := `\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}`
 	assert.Regexp(t, timestampRegex, logPath)
 }
 
 func TestCreateLogPath_NotSimulate_ContainsTimestamp(t *testing.T) {
-	_, logPath := CreateMainLogger("", false)
+	_, logPath, err := CreateMainLogger("", false)
+	require.NoError(t, err)
 	// Check if the logPath contains a timestamp in the format '2006-01-02T15-04-05'
 	timestampRegex := `\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}`
 	assert.Regexp(t, timestampRegex, logPath)

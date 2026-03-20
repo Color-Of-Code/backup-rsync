@@ -2,6 +2,7 @@
 package internal
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -34,21 +35,21 @@ func getLogPath(simulate bool, configPath string) string {
 	return logPath
 }
 
-func CreateMainLogger(configPath string, simulate bool) (*log.Logger, string) {
+func CreateMainLogger(configPath string, simulate bool) (*log.Logger, string, error) {
 	logPath := getLogPath(simulate, configPath)
 	overallLogPath := logPath + "/summary.log"
 
 	err := os.MkdirAll(logPath, LogDirPermission)
 	if err != nil {
-		log.Fatalf("Failed to create log directory: %v", err)
+		return nil, "", fmt.Errorf("failed to create log directory: %w", err)
 	}
 
 	overallLogFile, err := os.OpenFile(overallLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, LogFilePermission)
 	if err != nil {
-		log.Fatalf("Failed to open overall log file: %v", err)
+		return nil, "", fmt.Errorf("failed to open overall log file: %w", err)
 	}
 
 	logger := log.New(overallLogFile, "", log.LstdFlags)
 
-	return logger, logPath
+	return logger, logPath, nil
 }

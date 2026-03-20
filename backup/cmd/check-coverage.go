@@ -15,9 +15,14 @@ func buildCheckCoverageCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "check-coverage",
 		Short: "Check path coverage",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
-			cfg := internal.LoadResolvedConfig(configPath)
+
+			cfg, err := internal.LoadResolvedConfig(configPath)
+			if err != nil {
+				return fmt.Errorf("loading config: %w", err)
+			}
+
 			uncoveredPaths := internal.ListUncoveredPaths(fs, cfg)
 
 			fmt.Println("Uncovered paths:")
@@ -25,6 +30,8 @@ func buildCheckCoverageCommand() *cobra.Command {
 			for _, path := range uncoveredPaths {
 				fmt.Println(path)
 			}
+
+			return nil
 		},
 	}
 }

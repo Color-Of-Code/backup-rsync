@@ -2,6 +2,8 @@ package internal_test
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -359,4 +361,112 @@ func TestResolveConfig(t *testing.T) {
 	assert.Equal(t, "/backup/user/Documents", resolvedCfg.Jobs[0].Target)
 	assert.Equal(t, "/home/user/Pictures", resolvedCfg.Jobs[1].Source)
 	assert.Equal(t, "/backup/user/Pictures", resolvedCfg.Jobs[1].Target)
+}
+
+// writeTestConfig writes YAML content to a temp file and returns its path.
+func writeTestConfig(t *testing.T, content string) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.yaml")
+	err := os.WriteFile(path, []byte(content), 0600)
+	require.NoError(t, err)
+
+	return path
+}
+
+func TestLoadResolvedConfig_FileNotFound(t *testing.T) {
+	_, err := LoadResolvedConfig("/nonexistent/path/config.yaml")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to open config")
+}
+
+func TestLoadResolvedConfig_InvalidYAML(t *testing.T) {
+	path := writeTestConfig(t, "{{invalid yaml")
+
+	_, err := LoadResolvedConfig(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to parse YAML")
+}
+
+func TestLoadResolvedConfig_DuplicateJobNames(t *testing.T) {
+	yaml := `
+sources:
+  - path: "/src"
+targets:
+  - path: "/tgt"
+jobs:
+  - name: "dup"
+    source: "/src/a"
+    target: "/tgt/a"
+  - name: "dup"
+    source: "/src/b"
+    target: "/tgt/b"
+`
+	path := writeTestConfig(t, yaml)
+
+	_, err := LoadResolvedConfig(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "job validation failed")
+	assert.Contains(t, err.Error(), "duplicate job name: dup")
+}
+
+func TestLoadResolvedConfig_InvalidSourcePath(t *testing.T) {
+	yaml := `
+sources:
+  - path: "/home"
+targets:
+  - path: "/backup"
+jobs:
+  - name: "job1"
+    source: "/invalid/source"
+    target: "/backup/stuff"
+`
+	path := writeTestConfig(t, yaml)
+
+	_, err := LoadResolvedConfig(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "path validation failed")
+}
+
+func TestLoadResolvedConfig_OverlappingSourcePaths(t *testing.T) {
+	yaml := `
+sources:
+  - path: "/home"
+targets:
+  - path: "/backup"
+jobs:
+  - name: "parent"
+    source: "/home/user"
+    target: "/backup/user"
+  - name: "child"
+    source: "/home/user/docs"
+    target: "/backup/docs"
+`
+	path := writeTestConfig(t, yaml)
+
+	_, err := LoadResolvedConfig(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "job source path validation failed")
+}
+
+func TestLoadResolvedConfig_ValidConfig(t *testing.T) {
+	yaml := `
+sources:
+  - path: "/home"
+targets:
+  - path: "/backup"
+variables:
+  base: "/backup"
+jobs:
+  - name: "docs"
+    source: "/home/docs"
+    target: "${base}/docs"
+`
+	path := writeTestConfig(t, yaml)
+
+	cfg, err := LoadResolvedConfig(path)
+	require.NoError(t, err)
+	assert.Len(t, cfg.Jobs, 1)
+	assert.Equal(t, "/backup/docs", cfg.Jobs[0].Target)
 }

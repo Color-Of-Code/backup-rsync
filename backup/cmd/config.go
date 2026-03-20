@@ -16,20 +16,34 @@ func buildConfigCommand() *cobra.Command {
 	var showVerb = &cobra.Command{
 		Use:   "show",
 		Short: "Show resolved configuration",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
-			cfg := internal.LoadResolvedConfig(configPath)
+
+			cfg, err := internal.LoadResolvedConfig(configPath)
+			if err != nil {
+				return fmt.Errorf("loading config: %w", err)
+			}
+
 			fmt.Printf("Resolved Configuration:\n%s\n", cfg)
+
+			return nil
 		},
 	}
 
 	var validateVerb = &cobra.Command{
 		Use:   "validate",
 		Short: "Validate configuration",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
-			internal.LoadResolvedConfig(configPath)
+
+			_, err := internal.LoadResolvedConfig(configPath)
+			if err != nil {
+				return fmt.Errorf("validating config: %w", err)
+			}
+
 			fmt.Println("Configuration is valid.")
+
+			return nil
 		},
 	}
 

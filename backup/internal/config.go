@@ -173,40 +173,39 @@ func validateJobPaths(jobs []Job, pathType string, getPath func(job Job) string)
 	return nil
 }
 
-func LoadResolvedConfig(configPath string) Config {
+func LoadResolvedConfig(configPath string) (Config, error) {
 	configFile, err := os.Open(configPath)
 	if err != nil {
-		log.Fatalf("Failed to open config: %v", err)
+		return Config{}, fmt.Errorf("failed to open config: %w", err)
 	}
+	defer configFile.Close()
 
 	cfg, err := LoadConfig(configFile)
-	_ = configFile.Close()
-
 	if err != nil {
-		log.Fatalf("Failed to parse YAML: %v", err)
+		return Config{}, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
 	err = ValidateJobNames(cfg.Jobs)
 	if err != nil {
-		log.Fatalf("Job validation failed: %v", err)
+		return Config{}, fmt.Errorf("job validation failed: %w", err)
 	}
 
 	resolvedCfg := ResolveConfig(cfg)
 
 	err = ValidatePaths(resolvedCfg)
 	if err != nil {
-		log.Fatalf("Path validation failed: %v", err)
+		return Config{}, fmt.Errorf("path validation failed: %w", err)
 	}
 
 	err = validateJobPaths(resolvedCfg.Jobs, "source", func(job Job) string { return job.Source })
 	if err != nil {
-		log.Fatalf("Job source path validation failed: %v", err)
+		return Config{}, fmt.Errorf("job source path validation failed: %w", err)
 	}
 
 	err = validateJobPaths(resolvedCfg.Jobs, "target", func(job Job) string { return job.Target })
 	if err != nil {
-		log.Fatalf("Job target path validation failed: %v", err)
+		return Config{}, fmt.Errorf("job target path validation failed: %w", err)
 	}
 
-	return resolvedCfg
+	return resolvedCfg, nil
 }

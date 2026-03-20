@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"backup-rsync/backup/internal"
+	"fmt"
 
 	"github.com/spf13/cobra"
 )
@@ -10,15 +11,25 @@ func buildSimulateCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "simulate",
 		Short: "Simulate the sync jobs",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			rsyncPath, _ := cmd.Flags().GetString("rsync-path")
 
-			cfg := internal.LoadResolvedConfig(configPath)
-			logger, logPath := internal.CreateMainLogger(configPath, true)
+			cfg, err := internal.LoadResolvedConfig(configPath)
+			if err != nil {
+				return fmt.Errorf("loading config: %w", err)
+			}
+
+			logger, logPath, err := internal.CreateMainLogger(configPath, true)
+			if err != nil {
+				return fmt.Errorf("creating logger: %w", err)
+			}
+
 			command := internal.NewSimulateCommand(rsyncPath, logPath)
 
 			cfg.Apply(command, logger)
+
+			return nil
 		},
 	}
 }
