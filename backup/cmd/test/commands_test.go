@@ -151,6 +151,25 @@ func TestRun_MissingConfig(t *testing.T) {
 	assert.Contains(t, err.Error(), "loading config")
 }
 
+func TestRun_ValidConfig(t *testing.T) {
+	cfgPath := writeConfigFile(t, `
+sources:
+  - path: "/home"
+targets:
+  - path: "/backup"
+jobs:
+  - name: "docs"
+    source: "/home/docs/"
+    target: "/backup/docs/"
+    enabled: true
+`)
+
+	stdout, err := executeCommand(t, "run", "--config", cfgPath)
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Status [docs]:")
+}
+
 // --- simulate ---
 
 func TestSimulate_MissingConfig(t *testing.T) {
@@ -158,6 +177,25 @@ func TestSimulate_MissingConfig(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "loading config")
+}
+
+func TestSimulate_ValidConfig(t *testing.T) {
+	cfgPath := writeConfigFile(t, `
+sources:
+  - path: "/home"
+targets:
+  - path: "/backup"
+jobs:
+  - name: "docs"
+    source: "/home/docs/"
+    target: "/backup/docs/"
+    enabled: true
+`)
+
+	stdout, err := executeCommand(t, "simulate", "--config", cfgPath)
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Status [docs]:")
 }
 
 // --- version ---
