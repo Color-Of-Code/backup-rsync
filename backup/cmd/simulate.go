@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func buildSimulateCommand() *cobra.Command {
+func buildSimulateCommand(shell internal.Exec) *cobra.Command {
 	return &cobra.Command{
 		Use:   "simulate",
 		Short: "Simulate the sync jobs",
@@ -26,7 +26,7 @@ func buildSimulateCommand() *cobra.Command {
 			}
 
 			out := cmd.OutOrStdout()
-			command := internal.NewSimulateCommand(rsyncPath, logPath, &internal.OsExec{}, out)
+			command := internal.NewSimulateCommand(rsyncPath, logPath, shell, out)
 
 			cfg.Apply(command, logger, out)
 

@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func buildListCommand() *cobra.Command {
+func buildListCommand(shell internal.Exec) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List the commands that will be executed",
@@ -23,7 +23,7 @@ func buildListCommand() *cobra.Command {
 			}
 
 			out := cmd.OutOrStdout()
-			command := internal.NewListCommand(rsyncPath, &internal.OsExec{}, out)
+			command := internal.NewListCommand(rsyncPath, shell, out)
 
 			logger := log.New(io.Discard, "", 0)
 			cfg.Apply(command, logger, out)

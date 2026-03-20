@@ -7,11 +7,21 @@ import (
 	"testing"
 
 	"backup-rsync/backup/cmd"
+	"backup-rsync/backup/internal"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type stubExec struct {
+	output []byte
+	err    error
+}
+
+func (s *stubExec) Execute(_ string, _ ...string) ([]byte, error) {
+	return s.output, s.err
+}
 
 func writeConfigFile(t *testing.T, content string) string {
 	t.Helper()
@@ -35,6 +45,22 @@ func executeCommandWithFs(t *testing.T, fs afero.Fs, args ...string) (string, er
 	t.Helper()
 
 	rootCmd := cmd.BuildRootCommandWithFs(fs)
+
+	var stdout bytes.Buffer
+
+	rootCmd.SetOut(&stdout)
+	rootCmd.SetErr(&bytes.Buffer{})
+	rootCmd.SetArgs(args)
+
+	err := rootCmd.Execute()
+
+	return stdout.String(), err
+}
+
+func executeCommandWithDeps(t *testing.T, fs afero.Fs, shell internal.Exec, args ...string) (string, error) {
+	t.Helper()
+
+	rootCmd := cmd.BuildRootCommandWithDeps(fs, shell)
 
 	var stdout bytes.Buffer
 
@@ -164,10 +190,13 @@ jobs:
     enabled: true
 `)
 
-	stdout, err := executeCommand(t, "run", "--config", cfgPath)
+	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
+
+	stdout, err := executeCommandWithDeps(t, afero.NewMemMapFs(), shell, "run", "--config", cfgPath)
 
 	require.NoError(t, err)
-	assert.Contains(t, stdout, "Status [docs]:")
+	assert.Contains(t, stdout, "Job: docs")
+	assert.Contains(t, stdout, "Status [docs]: SUCCESS")
 }
 
 // --- simulate ---
@@ -192,10 +221,13 @@ jobs:
     enabled: true
 `)
 
-	stdout, err := executeCommand(t, "simulate", "--config", cfgPath)
+	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
+
+	stdout, err := executeCommandWithDeps(t, afero.NewMemMapFs(), shell, "simulate", "--config", cfgPath)
 
 	require.NoError(t, err)
-	assert.Contains(t, stdout, "Status [docs]:")
+	assert.Contains(t, stdout, "Job: docs")
+	assert.Contains(t, stdout, "Status [docs]: SUCCESS")
 }
 
 // --- version ---
@@ -260,6 +292,16 @@ func TestVersion_ValidRsync(t *testing.T) {
 	assert.Contains(t, stdout, "Version Info:")
 }
 
+func TestVersion_WithMockExec(t *testing.T) {
+	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
+
+	stdout, err := executeCommandWithDeps(t, afero.NewMemMapFs(), shell, "version", "--rsync-path", "/usr/bin/rsync")
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Rsync Binary Path: /usr/bin/rsync")
+	assert.Contains(t, stdout, "rsync version 3.2.7")
+}
+
 // --- list (positive path) ---
 
 func TestList_ValidConfig(t *testing.T) {
@@ -275,7 +317,9 @@ jobs:
     enabled: true
 `)
 
-	stdout, err := executeCommand(t, "list", "--config", cfgPath)
+	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
+
+	stdout, err := executeCommandWithDeps(t, afero.NewMemMapFs(), shell, "list", "--config", cfgPath)
 
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "Job: docs")

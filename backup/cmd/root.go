@@ -1,15 +1,21 @@
 package cmd
 
 import (
+	"backup-rsync/backup/internal"
+
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
 func BuildRootCommand() *cobra.Command {
-	return BuildRootCommandWithFs(afero.NewOsFs())
+	return BuildRootCommandWithDeps(afero.NewOsFs(), &internal.OsExec{})
 }
 
 func BuildRootCommandWithFs(fs afero.Fs) *cobra.Command {
+	return BuildRootCommandWithDeps(fs, &internal.OsExec{})
+}
+
+func BuildRootCommandWithDeps(fs afero.Fs, shell internal.Exec) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "backup",
 		Short: "A tool for managing backups",
@@ -20,12 +26,12 @@ func BuildRootCommandWithFs(fs afero.Fs) *cobra.Command {
 	rootCmd.PersistentFlags().String("rsync-path", "/usr/bin/rsync", "Path to the rsync binary")
 
 	rootCmd.AddCommand(
-		buildListCommand(),
-		buildRunCommand(),
-		buildSimulateCommand(),
+		buildListCommand(shell),
+		buildRunCommand(shell),
+		buildSimulateCommand(shell),
 		buildConfigCommand(),
 		buildCheckCoverageCommand(fs),
-		buildVersionCommand(),
+		buildVersionCommand(shell),
 	)
 
 	return rootCmd

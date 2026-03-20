@@ -8,14 +8,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func buildVersionCommand() *cobra.Command {
+func buildVersionCommand(shell internal.Exec) *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Prints the rsync version, protocol version, and full path to the rsync binary.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			rsyncPath, _ := cmd.Flags().GetString("rsync-path")
 			out := cmd.OutOrStdout()
-			rsync := internal.NewSyncCommand(rsyncPath, "", &internal.OsExec{}, out)
+			rsync := internal.NewSyncCommand(rsyncPath, "", shell, out)
 
 			output, _, err := rsync.GetVersionInfo()
 			if err != nil {

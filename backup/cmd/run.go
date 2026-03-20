@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func buildRunCommand() *cobra.Command {
+func buildRunCommand(shell internal.Exec) *cobra.Command {
 	return &cobra.Command{
 		Use:   "run",
 		Short: "Execute the sync jobs",
@@ -26,7 +26,7 @@ func buildRunCommand() *cobra.Command {
 			}
 
 			out := cmd.OutOrStdout()
-			command := internal.NewSyncCommand(rsyncPath, logPath, &internal.OsExec{}, out)
+			command := internal.NewSyncCommand(rsyncPath, logPath, shell, out)
 
 			cfg.Apply(command, logger, out)
 
