@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// Exec abstracts command execution for testability.
 type Exec interface {
 	Execute(name string, args ...string) ([]byte, error)
 }

@@ -7,14 +7,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// BuildRootCommand creates the root cobra command with production defaults.
 func BuildRootCommand() *cobra.Command {
 	return BuildRootCommandWithDeps(afero.NewOsFs(), &internal.OsExec{})
 }
 
+// BuildRootCommandWithFs creates the root command with a custom filesystem.
 func BuildRootCommandWithFs(fs afero.Fs) *cobra.Command {
 	return BuildRootCommandWithDeps(fs, &internal.OsExec{})
 }
 
+// BuildRootCommandWithDeps creates the root command with full dependency injection.
 func BuildRootCommandWithDeps(fs afero.Fs, shell internal.Exec) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "backup",

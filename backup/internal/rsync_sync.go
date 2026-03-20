@@ -2,10 +2,12 @@ package internal
 
 import "io"
 
+// SyncCommand runs rsync to perform the actual backup.
 type SyncCommand struct {
 	SharedCommand
 }
 
+// NewSyncCommand creates a SyncCommand with the given dependencies.
 func NewSyncCommand(binPath string, logPath string, shell Exec, output io.Writer) SyncCommand {
 	return SyncCommand{
 		SharedCommand: NewSharedCommand(binPath, logPath, shell, output),

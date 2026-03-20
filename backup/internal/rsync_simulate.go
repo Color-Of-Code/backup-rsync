@@ -2,10 +2,12 @@ package internal
 
 import "io"
 
+// SimulateCommand runs rsync in dry-run mode and captures output.
 type SimulateCommand struct {
 	SharedCommand
 }
 
+// NewSimulateCommand creates a SimulateCommand with the given dependencies.
 func NewSimulateCommand(binPath string, logPath string, shell Exec, output io.Writer) SimulateCommand {
 	return SimulateCommand{
 		SharedCommand: NewSharedCommand(binPath, logPath, shell, output),

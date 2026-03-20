@@ -14,6 +14,7 @@ var ErrInvalidRsyncPath = errors.New("rsync path must be an absolute path")
 
 const RsyncVersionFlag = "--version"
 
+// SharedCommand holds common state for all rsync command types.
 type SharedCommand struct {
 	BinPath     string
 	BaseLogPath string
@@ -22,6 +23,7 @@ type SharedCommand struct {
 	Output io.Writer
 }
 
+// NewSharedCommand creates a SharedCommand with the given dependencies.
 func NewSharedCommand(binPath string, logPath string, shell Exec, output io.Writer) SharedCommand {
 	return SharedCommand{
 		BinPath:     binPath,
@@ -93,6 +95,7 @@ func (c SharedCommand) GetVersionInfo() (string, string, error) {
 	return string(output), rsyncPath, nil
 }
 
+// ArgumentsForJob builds the rsync argument list for a given job.
 func ArgumentsForJob(job Job, logPath string, simulate bool) []string {
 	args := []string{"-aiv", "--stats"}
 

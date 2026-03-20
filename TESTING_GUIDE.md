@@ -1,132 +1,161 @@
 # Testing Guide
 
-## Better Go Testing Practices
+## Overview
 
-Instead of using `init()` functions to set up mocks, this codebase now uses dependency injection with interfaces for better testability.
+All tests use dependency injection — no global state mutation. Key patterns:
 
-### The Old Way (Problematic)
+- **`testify`** for assertions (`require` for fatal checks, `assert` for non-fatal)
+- **`mockery`** for generated mocks (`MockExec`, `MockJobCommand`)
+- **`afero`** for in-memory filesystem abstraction
+- **`bytes.Buffer`** for capturing output
+- **Table-driven tests** for multiple input scenarios
+- Test files live in `<package>/test/` subdirectories
 
-```go
-// DON'T DO THIS - Global state mutation in init()
-var mockExecCommand = func(name string, args ...string) *exec.Cmd {
-    // mock implementation
-}
+## Test Architecture
 
-func init() {
-    internal.ExecCommand = mockExecCommand  // Mutates global state
-}
+```
+backup/
+  cmd/test/
+    commands_test.go   # CLI integration tests (all commands)
+    root_test.go       # Root command help output
+  internal/test/
+    check_test.go      # CoverageChecker tests (afero-based)
+    config_test.go     # Config loading, validation, Apply
+    helper_test.go     # NormalizePath, CreateMainLogger
+    job_test.go        # Job.Apply with MockJobCommand
+    rsync_test.go      # Command constructors, Run methods, GetVersionInfo
+    mock_exec_test.go          # Generated mock for Exec interface
+    mock_jobcommand_test.go    # Generated mock for JobCommand interface
 ```
 
-**Problems with this approach:**
-- Global state mutation affects all tests
-- Tests can interfere with each other
-- Difficult to reset between tests
-- Not explicit about what's being mocked
-- Makes parallel testing unsafe
+## Dependency Injection Points
 
-### The New Way (Recommended)
+| Dependency | Interface/Type | Real | Test |
+|---|---|---|---|
+| Command execution | `internal.Exec` | `OsExec` | `MockExec` or `stubExec` |
+| Job runner | `internal.JobCommand` | `ListCommand`, `SyncCommand`, `SimulateCommand` | `MockJobCommand` |
+| Filesystem | `afero.Fs` | `afero.NewOsFs()` | `afero.NewMemMapFs()` |
+| Output | `io.Writer` | `os.Stdout` / `cmd.OutOrStdout()` | `bytes.Buffer` |
+| Logging | `*log.Logger` | File-backed logger | `log.New(&buf, "", 0)` |
+| Time | `time.Time` | `time.Now()` | Fixed `time.Date(...)` |
 
-```go
-// Define interface for testability
-type JobRunner interface {
-    Execute(name string, args ...string) ([]byte, error)
-}
+## Command-Level Tests (cmd/test/)
 
-// Real implementation
-type RealSync struct{}
-func (r *RealSync) Execute(name string, args ...string) ([]byte, error) {
-    cmd := exec.Command(name, args...)
-    return cmd.CombinedOutput()
-}
-
-// Test implementation
-type MockCommandExecutor struct {
-    CapturedCommands []MockCommand
-}
-func (m *MockCommandExecutor) Execute(name string, args ...string) ([]byte, error) {
-    // Mock logic here
-}
-```
-
-### Testing Examples
-
-#### 1. Simple Test with Mock
+Commands are tested through cobra's `Execute()` with captured stdout:
 
 ```go
-func TestExecuteJob(t *testing.T) {
-    // Create mock executor for this test only
-    mockExecutor := &MockCommandExecutor{}
-    
-    job := internal.Job{
-        Name:    "test_job",
-        Source:  "/home/test/",
-        Target:  "/mnt/backup1/test/",
-        Enabled: true,
-    }
-    
-    // Use the executor-aware function
-    status := internal.ExecuteJobWithExecutor(job, true, false, "", mockExecutor)
-    
-    if status != "SUCCESS" {
-        t.Errorf("Expected SUCCESS, got %s", status)
-    }
-    
-    // Verify the mock was called correctly
-    if len(mockExecutor.CapturedCommands) == 0 {
-        t.Error("Expected command to be executed")
-    }
+// Stub for Exec interface — lightweight alternative to MockExec for cmd tests
+type stubExec struct {
+    output []byte
+    err    error
 }
-```
 
-#### 2. Test Setup with t.Cleanup() (Alternative Pattern)
+func (s *stubExec) Execute(_ string, _ ...string) ([]byte, error) {
+    return s.output, s.err
+}
 
-```go
-func setupMockExecutor(t *testing.T) *MockCommandExecutor {
+// Helper: run a command with full dependency injection
+func executeCommandWithDeps(t *testing.T, fs afero.Fs, shell internal.Exec, args ...string) (string, error) {
     t.Helper()
-    
-    // Store original to restore later
-    originalExecutor := internal.DefaultExecutor
-    
-    // Create mock
-    mockExecutor := &MockCommandExecutor{}
-    
-    // Set mock globally
-    internal.DefaultExecutor = mockExecutor
-    
-    // Restore original after test
-    t.Cleanup(func() {
-        internal.DefaultExecutor = originalExecutor
-    })
-    
-    return mockExecutor
-}
-
-func TestWithSetup(t *testing.T) {
-    mock := setupMockExecutor(t)
-    
-    // Use regular ExecuteJob function - it uses DefaultExecutor
-    status := internal.ExecuteJob(job, true, false, "")
-    
-    // Verify mock was used
-    assert.Equal(t, 1, len(mock.CapturedCommands))
+    rootCmd := cmd.BuildRootCommandWithDeps(fs, shell)
+    var stdout bytes.Buffer
+    rootCmd.SetOut(&stdout)
+    rootCmd.SetErr(&bytes.Buffer{})
+    rootCmd.SetArgs(args)
+    err := rootCmd.Execute()
+    return stdout.String(), err
 }
 ```
 
-### Benefits of the New Approach
+Usage:
 
-1. **Test Isolation**: Each test gets its own mock instance
-2. **Explicit Dependencies**: Clear what's being mocked in each test
-3. **Better Assertions**: Can inspect captured calls, arguments, etc.
-4. **Parallel Safe**: Tests don't interfere with each other
-5. **Easier Debugging**: Clearer test failures and state
-6. **Production Safety**: Real code unchanged, only test behavior modified
+```go
+func TestRun_ValidConfig(t *testing.T) {
+    cfgPath := writeConfigFile(t, `...yaml...`)
+    shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
 
-### Key Principles
+    stdout, err := executeCommandWithDeps(t, afero.NewMemMapFs(), shell, "run", "--config", cfgPath)
 
-1. **Use interfaces for external dependencies** (file system, network, exec, etc.)
-2. **Inject dependencies rather than using globals**
-3. **Keep mocks scoped to individual tests**
-4. **Use `t.Cleanup()` for setup/teardown patterns**
-5. **Make test intentions explicit in the test code**
+    require.NoError(t, err)
+    assert.Contains(t, stdout, "Job: docs")
+    assert.Contains(t, stdout, "Status [docs]: SUCCESS")
+}
+```
 
-This approach follows Go testing best practices and makes the codebase more maintainable and reliable.
+Three builder levels available:
+- `BuildRootCommand()` — production defaults (real OS filesystem, real exec)
+- `BuildRootCommandWithFs(fs)` — custom filesystem, real exec
+- `BuildRootCommandWithDeps(fs, shell)` — full control for testing
+
+## Internal Tests — Mockery Mocks
+
+Generated mocks use the expectation pattern:
+
+```go
+func TestConfigApply_VersionInfoSuccess(t *testing.T) {
+    mockCmd := NewMockJobCommand(t)
+    var output bytes.Buffer
+    logger := log.New(&bytes.Buffer{}, "", 0)
+
+    cfg := Config{
+        Jobs: []Job{
+            {Name: "job1", Source: "/src/", Target: "/dst/", Enabled: true},
+        },
+    }
+
+    mockCmd.EXPECT().GetVersionInfo().Return("rsync version 3.2.3", "/usr/bin/rsync", nil).Once()
+    mockCmd.EXPECT().Run(mock.AnythingOfType("internal.Job")).Return(Success).Once()
+
+    err := cfg.Apply(mockCmd, logger, &output)
+    require.NoError(t, err)
+}
+```
+
+## CoverageChecker Tests (afero)
+
+The `CoverageChecker` uses `afero.Fs` so tests never hit the real filesystem:
+
+```go
+func newTestChecker() (*CoverageChecker, *bytes.Buffer) {
+    var buf bytes.Buffer
+    checker := &CoverageChecker{
+        Logger: log.New(&buf, "", 0),
+        Fs:     afero.NewMemMapFs(),
+    }
+    return checker, &buf
+}
+```
+
+## Deterministic Time
+
+`CreateMainLogger` accepts `time.Time` for predictable log paths:
+
+```go
+func fixedTime() time.Time {
+    return time.Date(2025, 6, 15, 14, 30, 45, 0, time.UTC)
+}
+
+func TestCreateMainLogger_DeterministicLogPath(t *testing.T) {
+    _, logPath, cleanup, err := CreateMainLogger("backup.yaml", true, fixedTime())
+    require.NoError(t, err)
+    defer cleanup()
+    assert.Equal(t, "logs/sync-2025-06-15T14-30-45-backup-sim", logPath)
+}
+```
+
+## Running Tests
+
+```sh
+make test             # go test -race ./... -v
+make check-coverage   # Fail if coverage < 90%
+make report-coverage  # Generate HTML coverage report
+```
+
+## Key Principles
+
+1. **Inject, don't hardcode** — all external dependencies go through interfaces
+2. **Never hit the real filesystem** in unit tests — use `afero.NewMemMapFs()`
+3. **Use `require` for errors, `assert` for values** — `require` stops the test on failure
+4. **Table-driven tests** for multiple input/output scenarios
+5. **Scope mocks to individual tests** — each test creates its own mock instance
+6. **Defer cleanup** — `CreateMainLogger` returns a cleanup function; always `defer` it
