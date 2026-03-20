@@ -2,11 +2,14 @@ package internal_test
 
 import (
 	"bytes"
+	"errors"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
@@ -469,4 +472,59 @@ jobs:
 	require.NoError(t, err)
 	assert.Len(t, cfg.Jobs, 1)
 	assert.Equal(t, "/backup/docs", cfg.Jobs[0].Target)
+}
+
+func TestConfigApply_VersionInfoSuccess(t *testing.T) {
+	mockCmd := NewMockJobCommand(t)
+
+	var output bytes.Buffer
+
+	var logBuf bytes.Buffer
+
+	logger := log.New(&logBuf, "", 0)
+
+	cfg := Config{
+		Jobs: []Job{
+			{Name: "job1", Source: "/src/", Target: "/dst/", Enabled: true},
+			{Name: "job2", Source: "/src2/", Target: "/dst2/", Enabled: false},
+		},
+	}
+
+	mockCmd.EXPECT().GetVersionInfo().Return("rsync version 3.2.3", "/usr/bin/rsync", nil).Once()
+	mockCmd.EXPECT().Run(mock.AnythingOfType("internal.Job")).Return(Success).Once()
+
+	cfg.Apply(mockCmd, logger, &output)
+
+	assert.Contains(t, logBuf.String(), "Rsync Binary Path: /usr/bin/rsync")
+	assert.Contains(t, logBuf.String(), "Rsync Version Info: rsync version 3.2.3")
+	assert.Contains(t, logBuf.String(), "STATUS [job1]: SUCCESS")
+	assert.Contains(t, logBuf.String(), "STATUS [job2]: SKIPPED")
+	assert.Contains(t, output.String(), "Status [job1]: SUCCESS")
+	assert.Contains(t, output.String(), "Status [job2]: SKIPPED")
+}
+
+func TestConfigApply_VersionInfoError(t *testing.T) {
+	mockCmd := NewMockJobCommand(t)
+
+	var output bytes.Buffer
+
+	var logBuf bytes.Buffer
+
+	logger := log.New(&logBuf, "", 0)
+
+	cfg := Config{
+		Jobs: []Job{
+			{Name: "backup", Source: "/data/", Target: "/bak/", Enabled: true},
+		},
+	}
+
+	mockCmd.EXPECT().GetVersionInfo().Return("", "", errors.New("not found")).Once()
+	mockCmd.EXPECT().Run(mock.AnythingOfType("internal.Job")).Return(Failure).Once()
+
+	cfg.Apply(mockCmd, logger, &output)
+
+	assert.Contains(t, logBuf.String(), "Failed to fetch rsync version: not found")
+	assert.NotContains(t, logBuf.String(), "Rsync Binary Path")
+	assert.Contains(t, logBuf.String(), "STATUS [backup]: FAILURE")
+	assert.Contains(t, output.String(), "Status [backup]: FAILURE")
 }

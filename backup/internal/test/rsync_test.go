@@ -284,3 +284,21 @@ func TestSimulateCommand_Run_Failure(t *testing.T) {
 
 	assert.Equal(t, Failure, status)
 }
+
+func TestSimulateCommand_Run_LogWriteError(t *testing.T) {
+	mockExec := NewMockExec(t)
+
+	var buf bytes.Buffer
+
+	// Use a non-existent directory so WriteFile fails
+	cmd := NewSimulateCommand(rsyncPath, "/nonexistent/path", mockExec, &buf)
+	job := newTestJob()
+
+	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
+		Return([]byte("output"), nil).Once()
+
+	status := cmd.Run(job)
+
+	assert.Equal(t, Success, status)
+	assert.Contains(t, buf.String(), "Warning: Failed to write output to log file")
+}
