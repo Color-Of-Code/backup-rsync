@@ -30,14 +30,14 @@ backup/
 
 ## Dependency Injection Points
 
-| Dependency | Interface/Type | Real | Test |
-|---|---|---|---|
-| Command execution | `internal.Exec` | `OsExec` | `MockExec` or `stubExec` |
-| Job runner | `internal.JobCommand` | `ListCommand`, `SyncCommand`, `SimulateCommand` | `MockJobCommand` |
-| Filesystem | `afero.Fs` | `afero.NewOsFs()` | `afero.NewMemMapFs()` |
-| Output | `io.Writer` | `os.Stdout` / `cmd.OutOrStdout()` | `bytes.Buffer` |
-| Logging | `*log.Logger` | File-backed logger | `log.New(&buf, "", 0)` |
-| Time | `time.Time` | `time.Now()` | Fixed `time.Date(...)` |
+| Dependency        | Interface/Type        | Real                                            | Test                     |
+| ----------------- | --------------------- | ----------------------------------------------- | ------------------------ |
+| Command execution | `internal.Exec`       | `OsExec`                                        | `MockExec` or `stubExec` |
+| Job runner        | `internal.JobCommand` | `ListCommand`, `SyncCommand`, `SimulateCommand` | `MockJobCommand`         |
+| Filesystem        | `afero.Fs`            | `afero.NewOsFs()`                               | `afero.NewMemMapFs()`    |
+| Output            | `io.Writer`           | `os.Stdout` / `cmd.OutOrStdout()`               | `bytes.Buffer`           |
+| Logging           | `*log.Logger`         | File-backed logger                              | `log.New(&buf, "", 0)`   |
+| Time              | `time.Time`           | `time.Now()`                                    | Fixed `time.Date(...)`   |
 
 ## Command-Level Tests (cmd/test/)
 
@@ -83,6 +83,7 @@ func TestRun_ValidConfig(t *testing.T) {
 ```
 
 Three builder levels available:
+
 - `BuildRootCommand()` — production defaults (real OS filesystem, real exec)
 - `BuildRootCommandWithFs(fs)` — custom filesystem, real exec
 - `BuildRootCommandWithDeps(fs, shell)` — full control for testing

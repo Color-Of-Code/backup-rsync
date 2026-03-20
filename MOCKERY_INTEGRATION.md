@@ -14,15 +14,15 @@ The project uses `.mockery.yml` to control mock generation:
 
 ```yaml
 all: false
-dir: '{{.InterfaceDir}}/test'
+dir: "{{.InterfaceDir}}/test"
 filename: mock_{{.InterfaceName | lower}}_test.go
 force-file-write: true
 formatter: goimports
 generate: true
 include-auto-generated: false
 log-level: info
-structname: 'Mock{{.InterfaceName}}'
-pkgname: 'internal_test'
+structname: "Mock{{.InterfaceName}}"
+pkgname: "internal_test"
 recursive: false
 template: testify
 packages:
@@ -33,6 +33,7 @@ packages:
 ```
 
 Key points:
+
 - **Output directory**: `<InterfaceDir>/test/` (alongside other test files)
 - **Filename**: `mock_<interface>_test.go`
 - **Struct naming**: `Mock<Interface>` (e.g., `MockExec`, `MockJobCommand`)
@@ -41,10 +42,10 @@ Key points:
 
 ## Generated Mocks
 
-| Mock | Source Interface | File |
-|---|---|---|
-| `MockExec` | `Exec` | `backup/internal/test/mock_exec_test.go` |
-| `MockJobCommand` | `JobCommand` | `backup/internal/test/mock_jobcommand_test.go` |
+| Mock             | Source Interface | File                                           |
+| ---------------- | ---------------- | ---------------------------------------------- |
+| `MockExec`       | `Exec`           | `backup/internal/test/mock_exec_test.go`       |
+| `MockJobCommand` | `JobCommand`     | `backup/internal/test/mock_jobcommand_test.go` |
 
 ## Usage Examples
 

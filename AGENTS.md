@@ -76,6 +76,7 @@ make report-coverage  # Generate HTML coverage report
 ## CI Pipeline
 
 CI runs on every push/PR to `main` (`.github/workflows/go.yml`):
+
 1. Sanity check (format + clean + mod tidy)
 2. Lint (golangci-lint)
 3. Build
