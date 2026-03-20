@@ -20,6 +20,18 @@ type SharedCommand struct {
 	Shell Exec
 }
 
+func NewSharedCommand(binPath string, logPath string, shell Exec) SharedCommand {
+	return SharedCommand{
+		BinPath:     binPath,
+		BaseLogPath: logPath,
+		Shell:       shell,
+	}
+}
+
+func (c SharedCommand) JobLogPath(job Job) string {
+	return fmt.Sprintf("%s/job-%s.log", c.BaseLogPath, job.Name)
+}
+
 func (c SharedCommand) PrintArgs(job Job, args []string) {
 	fmt.Printf("Job: %s\n", job.Name)
 	fmt.Printf("Command: %s %s\n", c.BinPath, strings.Join(args, " "))
