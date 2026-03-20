@@ -21,10 +21,12 @@ func buildSimulateCommand(shell internal.Exec) *cobra.Command {
 				return fmt.Errorf("loading config: %w", err)
 			}
 
-			logger, logPath, err := internal.CreateMainLogger(configPath, true, time.Now())
+			logger, logPath, cleanup, err := internal.CreateMainLogger(configPath, true, time.Now())
 			if err != nil {
 				return fmt.Errorf("creating logger: %w", err)
 			}
+
+			defer cleanup()
 
 			out := cmd.OutOrStdout()
 			command := internal.NewSimulateCommand(rsyncPath, logPath, shell, out)

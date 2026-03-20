@@ -35,21 +35,25 @@ func getLogPath(simulate bool, configPath string, now time.Time) string {
 	return logPath
 }
 
-func CreateMainLogger(configPath string, simulate bool, now time.Time) (*log.Logger, string, error) {
+func CreateMainLogger(configPath string, simulate bool, now time.Time) (*log.Logger, string, func() error, error) {
 	logPath := getLogPath(simulate, configPath, now)
 	overallLogPath := logPath + "/summary.log"
 
 	err := os.MkdirAll(logPath, LogDirPermission)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to create log directory: %w", err)
+		return nil, "", nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
 
 	overallLogFile, err := os.OpenFile(overallLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, LogFilePermission)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to open overall log file: %w", err)
+		return nil, "", nil, fmt.Errorf("failed to open overall log file: %w", err)
 	}
 
 	logger := log.New(overallLogFile, "", log.LstdFlags)
 
-	return logger, logPath, nil
+	cleanup := func() error {
+		return overallLogFile.Close()
+	}
+
+	return logger, logPath, cleanup, nil
 }

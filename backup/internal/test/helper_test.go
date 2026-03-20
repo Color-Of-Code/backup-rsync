@@ -32,34 +32,49 @@ func fixedTime() time.Time {
 }
 
 func TestCreateMainLogger_Title_IsPresent(t *testing.T) {
-	logger, logPath, err := CreateMainLogger("title", true, fixedTime())
+	logger, logPath, cleanup, err := CreateMainLogger("title", true, fixedTime())
 	require.NoError(t, err)
+
+	defer cleanup()
+
 	assert.Contains(t, logPath, "title")
 	assert.NotNil(t, logger)
 }
 
 func TestCreateMainLogger_IsSimulate_HasSimSuffix(t *testing.T) {
-	logger, logPath, err := CreateMainLogger("", true, fixedTime())
+	logger, logPath, cleanup, err := CreateMainLogger("", true, fixedTime())
 	require.NoError(t, err)
+
+	defer cleanup()
+
 	assert.Contains(t, logPath, "-sim")
 	assert.NotNil(t, logger)
 }
 
 func TestCreateMainLogger_NotSimulate_HasNoSimSuffix(t *testing.T) {
-	logger, logPath, err := CreateMainLogger("", false, fixedTime())
+	logger, logPath, cleanup, err := CreateMainLogger("", false, fixedTime())
 	require.NoError(t, err)
+
+	defer cleanup()
+
 	assert.NotContains(t, logPath, "-sim")
 	assert.NotNil(t, logger)
 }
 
 func TestCreateMainLogger_DeterministicLogPath(t *testing.T) {
-	_, logPath, err := CreateMainLogger("backup.yaml", true, fixedTime())
+	_, logPath, cleanup, err := CreateMainLogger("backup.yaml", true, fixedTime())
 	require.NoError(t, err)
+
+	defer cleanup()
+
 	assert.Equal(t, "logs/sync-2025-06-15T14-30-45-backup-sim", logPath)
 }
 
 func TestCreateMainLogger_DeterministicLogPath_NoSimulate(t *testing.T) {
-	_, logPath, err := CreateMainLogger("sync.yaml", false, fixedTime())
+	_, logPath, cleanup, err := CreateMainLogger("sync.yaml", false, fixedTime())
 	require.NoError(t, err)
+
+	defer cleanup()
+
 	assert.Equal(t, "logs/sync-2025-06-15T14-30-45-sync", logPath)
 }
