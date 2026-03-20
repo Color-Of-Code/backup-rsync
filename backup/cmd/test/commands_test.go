@@ -177,6 +177,32 @@ func TestRun_MissingConfig(t *testing.T) {
 	assert.Contains(t, err.Error(), "loading config")
 }
 
+func TestRun_CreateLoggerError(t *testing.T) {
+	cfgPath := writeConfigFile(t, `
+sources:
+  - path: "/home"
+targets:
+  - path: "/backup"
+jobs:
+  - name: "docs"
+    source: "/home/docs/"
+    target: "/backup/docs/"
+`)
+
+	// Block log directory creation by placing a file named "logs"
+	tmpDir := t.TempDir()
+	t.Chdir(tmpDir)
+
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "logs"), []byte("block"), 0600))
+
+	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
+
+	_, err := executeCommandWithDeps(t, afero.NewMemMapFs(), shell, "run", "--config", cfgPath)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "creating logger")
+}
+
 func TestRun_ValidConfig(t *testing.T) {
 	cfgPath := writeConfigFile(t, `
 sources:
@@ -206,6 +232,31 @@ func TestSimulate_MissingConfig(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "loading config")
+}
+
+func TestSimulate_CreateLoggerError(t *testing.T) {
+	cfgPath := writeConfigFile(t, `
+sources:
+  - path: "/home"
+targets:
+  - path: "/backup"
+jobs:
+  - name: "docs"
+    source: "/home/docs/"
+    target: "/backup/docs/"
+`)
+
+	tmpDir := t.TempDir()
+	t.Chdir(tmpDir)
+
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "logs"), []byte("block"), 0600))
+
+	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
+
+	_, err := executeCommandWithDeps(t, afero.NewMemMapFs(), shell, "simulate", "--config", cfgPath)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "creating logger")
 }
 
 func TestSimulate_ValidConfig(t *testing.T) {
@@ -253,6 +304,29 @@ func TestCheckCoverage_MissingConfig(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "loading config")
+}
+
+func TestCheckCoverage_WithUncoveredPaths(t *testing.T) {
+	cfgPath := writeConfigFile(t, `
+sources:
+  - path: "/src"
+targets:
+  - path: "/dst"
+jobs:
+  - name: "docs"
+    source: "/src/docs/"
+    target: "/dst/docs/"
+`)
+
+	fs := afero.NewMemMapFs()
+	_ = fs.MkdirAll("/src/docs", 0755)
+	_ = fs.MkdirAll("/src/photos", 0755)
+
+	stdout, err := executeCommandWithFs(t, fs, "check-coverage", "--config", cfgPath)
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Uncovered paths:")
+	assert.Contains(t, stdout, "/src")
 }
 
 func TestCheckCoverage_ValidConfig(t *testing.T) {
