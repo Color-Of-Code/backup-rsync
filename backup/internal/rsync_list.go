@@ -4,9 +4,9 @@ type ListCommand struct {
 	SharedCommand
 }
 
-func NewListCommand(binPath string) ListCommand {
+func NewListCommand(binPath string, shell Exec) ListCommand {
 	return ListCommand{
-		SharedCommand: NewSharedCommand(binPath, "", &OsExec{}),
+		SharedCommand: NewSharedCommand(binPath, "", shell),
 	}
 }
 

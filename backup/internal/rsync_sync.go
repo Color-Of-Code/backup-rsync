@@ -4,9 +4,9 @@ type SyncCommand struct {
 	SharedCommand
 }
 
-func NewSyncCommand(binPath string, logPath string) SyncCommand {
+func NewSyncCommand(binPath string, logPath string, shell Exec) SyncCommand {
 	return SyncCommand{
-		SharedCommand: NewSharedCommand(binPath, logPath, &OsExec{}),
+		SharedCommand: NewSharedCommand(binPath, logPath, shell),
 	}
 }
 

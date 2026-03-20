@@ -25,7 +25,7 @@ func buildRunCommand() *cobra.Command {
 				return fmt.Errorf("creating logger: %w", err)
 			}
 
-			command := internal.NewSyncCommand(rsyncPath, logPath)
+			command := internal.NewSyncCommand(rsyncPath, logPath, &internal.OsExec{})
 
 			cfg.Apply(command, logger)
 

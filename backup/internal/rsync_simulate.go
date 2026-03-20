@@ -4,9 +4,9 @@ type SimulateCommand struct {
 	SharedCommand
 }
 
-func NewSimulateCommand(binPath string, logPath string) SimulateCommand {
+func NewSimulateCommand(binPath string, logPath string, shell Exec) SimulateCommand {
 	return SimulateCommand{
-		SharedCommand: NewSharedCommand(binPath, logPath, &OsExec{}),
+		SharedCommand: NewSharedCommand(binPath, logPath, shell),
 	}
 }
 

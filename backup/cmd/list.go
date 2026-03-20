@@ -22,7 +22,7 @@ func buildListCommand() *cobra.Command {
 				return fmt.Errorf("loading config: %w", err)
 			}
 
-			command := internal.NewListCommand(rsyncPath)
+			command := internal.NewListCommand(rsyncPath, &internal.OsExec{})
 
 			logger := log.New(io.Discard, "", 0)
 			cfg.Apply(command, logger)

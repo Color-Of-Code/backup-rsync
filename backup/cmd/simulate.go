@@ -25,7 +25,7 @@ func buildSimulateCommand() *cobra.Command {
 				return fmt.Errorf("creating logger: %w", err)
 			}
 
-			command := internal.NewSimulateCommand(rsyncPath, logPath)
+			command := internal.NewSimulateCommand(rsyncPath, logPath, &internal.OsExec{})
 
 			cfg.Apply(command, logger)
 
