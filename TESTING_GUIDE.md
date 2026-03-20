@@ -16,8 +16,9 @@ All tests use dependency injection — no global state mutation. Key patterns:
 ```
 backup/
   cmd/test/
-    commands_test.go   # CLI integration tests (all commands)
-    root_test.go       # Root command help output
+    commands_test.go      # CLI command tests (all commands, stubbed exec)
+    integration_test.go   # Integration tests with real rsync (build tag: integration)
+    root_test.go          # Root command help output
   internal/test/
     check_test.go      # CoverageChecker tests (afero-based)
     config_test.go     # Config loading, validation, Apply
@@ -144,12 +145,76 @@ func TestCreateMainLogger_DeterministicLogPath(t *testing.T) {
 }
 ```
 
+## Integration Tests
+
+Integration tests live in `cmd/test/integration_test.go` behind the `//go:build integration` tag. They exercise the full CLI with **real rsync** against temp directories — no mocks or stubs.
+
+### Build Tag
+
+```go
+//go:build integration
+```
+
+Tests are excluded from `make test` and `make check-coverage`. Run them separately:
+
+```sh
+make test-integration   # go test -race -tags=integration ./... -v
+```
+
+### Design Principles
+
+- **Real rsync** — uses `/usr/bin/rsync` via `BuildRootCommand()` (production defaults)
+- **Real filesystem** — creates temp directories via `t.TempDir()`, cleaned up automatically
+- **Reproducible** — each test sets up its own isolated source/target directory pair
+- **No mocks** — validates actual rsync behavior (file transfer, deletion, exclusions)
+
+### Scenarios Covered
+
+| Category             | Tests                                                                            | What's Verified                                                                 |
+| -------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **run — basic**      | `BasicSync`, `IdempotentSync`, `PartialChanges`, `EmptySource`, `DeepHierarchy`  | Files are synced correctly; re-sync is idempotent; only modified files transfer |
+| **run — delete**     | `DeleteRemovesExtraFiles`, `NoDeletePreservesExtraFiles`                         | `--delete` flag removes stale files; omitting it preserves them                 |
+| **run — exclusions** | `Exclusions`                                                                     | `--exclude` patterns prevent syncing of matching paths                          |
+| **run — jobs**       | `DisabledJobSkipped`, `MultipleJobs`, `MixedJobsSummary`, `VariableSubstitution` | Multi-job orchestration, enabled/disabled, `${var}` resolution                  |
+| **simulate**         | `NoChanges`, `ShowsChanges`, `SimulateThenRun`                                   | Dry-run produces no side effects; subsequent run works normally                 |
+| **list**             | `ShowsCommands`                                                                  | Prints rsync commands without executing them                                    |
+| **check-coverage**   | `FullCoverage`, `IncompleteCoverage`                                             | Coverage checker on real directory trees                                        |
+| **config**           | `ConfigShow`, `ConfigValidate_Valid`, `ConfigValidate_OverlappingSources`        | End-to-end config parsing and validation                                        |
+| **version**          | `Version`                                                                        | Real rsync version output                                                       |
+
+### Example
+
+```go
+func TestIntegration_Run_BasicSync(t *testing.T) {
+    src, dst := setupDirs(t)
+    writeFile(t, filepath.Join(src, "hello.txt"), "hello world")
+
+    cfgPath := writeIntegrationConfig(t, `
+sources:
+  - path: "`+src+`"
+targets:
+  - path: "`+dst+`"
+jobs:
+  - name: "basic"
+    source: "`+src+`/"
+    target: "`+dst+`/"
+    delete: false
+`)
+
+    stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
+    require.NoError(t, err)
+    assert.Contains(t, stdout, "Status [basic]: SUCCESS")
+    assert.Equal(t, "hello world", readFileContent(t, filepath.Join(dst, "hello.txt")))
+}
+```
+
 ## Running Tests
 
 ```sh
-make test             # go test -race ./... -v
-make check-coverage   # Fail if coverage < 90%
-make report-coverage  # Generate HTML coverage report
+make test               # go test -race ./... -v (unit tests only)
+make test-integration   # go test -race -tags=integration ./... -v (includes integration)
+make check-coverage     # Fail if coverage < threshold (unit tests only)
+make report-coverage    # Generate HTML coverage report
 ```
 
 ## Key Principles

@@ -47,15 +47,16 @@ backup/
 ## Build and Test
 
 ```sh
-make build            # Build to dist/backup
-make test             # go test -race ./... -v
-make lint             # golangci-lint run ./...
-make lint-fix         # Auto-fix lint issues
-make format           # go fmt ./...
-make tidy             # gofmt -s + go mod tidy
-make sanity-check     # format + clean + tidy
-make check-coverage   # Fail if coverage < 90%
-make report-coverage  # Generate HTML coverage report
+make build              # Build to dist/backup
+make test               # go test -race ./... -v
+make test-integration   # go test -race -tags=integration ./... -v
+make lint               # golangci-lint run ./...
+make lint-fix           # Auto-fix lint issues
+make format             # go fmt ./...
+make tidy               # gofmt -s + go mod tidy
+make sanity-check       # format + clean + tidy
+make check-coverage     # Fail if coverage < 98%
+make report-coverage    # Generate HTML coverage report
 ```
 
 ## Testing Conventions
@@ -71,6 +72,7 @@ make report-coverage  # Generate HTML coverage report
 - Prefer table-driven tests for multiple input scenarios
 - Use `afero.NewMemMapFs()` in tests — never hit the real filesystem
 - Use `bytes.Buffer` or `io.Discard` for output capture in tests
+- Integration tests use `//go:build integration` tag and run real rsync on temp directories
 - CI enforces coverage threshold via `make check-coverage`
 
 ## CI Pipeline
@@ -81,7 +83,8 @@ CI runs on every push/PR to `main` (`.github/workflows/go.yml`):
 2. Lint (golangci-lint)
 3. Build
 4. Test (with `-race` flag)
-5. Coverage threshold enforcement (90%)
+5. Integration test (with real rsync, `-tags=integration`)
+6. Coverage threshold enforcement (98%)
 
 ## Conventions
 
