@@ -213,22 +213,71 @@ func TestListUncoveredPathsVariationsSubfoldersCovered(t *testing.T) {
 
 func TestListUncoveredPathsVariationsSubfoldersPartiallyCovered(t *testing.T) {
 	t.Skip("Skipping test for partially covered subfolders")
-	// // Variation: one source covered, one uncovered subfolder
-	// runListUncoveredPathsTest(t,
-	// 	map[string][]string{
-	// 		"/home/data":            {"family"},
-	// 		"/home/data/family":     {"me", "you"},
-	// 		"/home/data/family/me":  {"a"},
-	// 		"/home/data/family/you": {"a"},
-	// 	},
-	// 	Config{
-	// 		Sources: []Path{
-	// 			{Path: "/home/data"},
-	// 		},
-	// 		Jobs: []Job{
-	// 			{Name: "JobMe", Source: "/home/data/family/me"},
-	// 		},
-	// 	},
-	// 	[]string{"/home/data/family/you"},
-	// )
+}
+
+// Test that a job with exclusions properly marks child paths as excluded.
+func TestListUncoveredPaths_JobExclusion(t *testing.T) {
+	runListUncoveredPathsTest(t,
+		map[string][]string{
+			"/data":       {"docs", "cache"},
+			"/data/docs":  {},
+			"/data/cache": {},
+		},
+		Config{
+			Sources: []Path{
+				{Path: "/data"},
+			},
+			Jobs: []Job{
+				{Name: "backup", Source: "/data/", Exclusions: []string{"cache"}},
+			},
+		},
+		[]string{},
+	)
+}
+
+// Test that duplicate source paths are processed only once.
+func TestListUncoveredPaths_DuplicateSourcesSkipped(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	_ = fs.MkdirAll("/data", 0755)
+
+	var logBuf bytes.Buffer
+
+	checker := newTestChecker(fs, &logBuf)
+
+	cfg := Config{
+		Sources: []Path{
+			{Path: "/data"},
+			{Path: "/data"},
+		},
+		Jobs: []Job{
+			{Name: "backup", Source: "/data"},
+		},
+	}
+
+	result := checker.ListUncoveredPaths(cfg)
+
+	assert.Empty(t, result)
+	assert.Contains(t, logBuf.String(), "SKIP: Path '/data' already seen")
+}
+
+// Test getChildDirectories error path (unreadable directory).
+func TestListUncoveredPaths_UnreadableDirectory(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	// Don't create /data, so ReadDir will fail
+
+	var logBuf bytes.Buffer
+
+	checker := newTestChecker(fs, &logBuf)
+
+	cfg := Config{
+		Sources: []Path{
+			{Path: "/data"},
+		},
+		Jobs: []Job{},
+	}
+
+	result := checker.ListUncoveredPaths(cfg)
+
+	assert.Equal(t, []string{"/data"}, result)
+	assert.Contains(t, logBuf.String(), "ADD: Path '/data' is uncovered")
 }
