@@ -142,3 +142,124 @@ func TestGetVersionInfo_IncompletePath(t *testing.T) {
 	assert.Empty(t, versionInfo)
 	assert.Empty(t, fullpath)
 }
+
+func newTestJob() Job {
+	return Job{
+		Name:       "test-job",
+		Source:     "/home/user/docs/",
+		Target:     "/backup/user/docs/",
+		Delete:     true,
+		Enabled:    true,
+		Exclusions: []string{"*.tmp"},
+	}
+}
+
+func TestNewSharedCommand(t *testing.T) {
+	mockExec := NewMockExec(t)
+	cmd := NewSharedCommand(rsyncPath, "/logs/base", mockExec)
+
+	assert.Equal(t, rsyncPath, cmd.BinPath)
+	assert.Equal(t, "/logs/base", cmd.BaseLogPath)
+	assert.Equal(t, mockExec, cmd.Shell)
+}
+
+func TestJobLogPath(t *testing.T) {
+	cmd := NewSharedCommand(rsyncPath, "/logs/sync-2025", nil)
+	job := newTestJob()
+
+	logPath := cmd.JobLogPath(job)
+
+	assert.Equal(t, "/logs/sync-2025/job-test-job.log", logPath)
+}
+
+func TestNewListCommand(t *testing.T) {
+	mockExec := NewMockExec(t)
+	cmd := NewListCommand(rsyncPath, mockExec)
+
+	assert.Equal(t, rsyncPath, cmd.BinPath)
+	assert.Empty(t, cmd.BaseLogPath)
+	assert.Equal(t, mockExec, cmd.Shell)
+}
+
+func TestListCommand_Run_ReturnsSuccess(t *testing.T) {
+	mockExec := NewMockExec(t)
+	cmd := NewListCommand(rsyncPath, mockExec)
+	job := newTestJob()
+
+	// ListCommand.Run only prints args, doesn't call Shell.Execute
+	status := cmd.Run(job)
+
+	assert.Equal(t, Success, status)
+}
+
+func TestNewSyncCommand(t *testing.T) {
+	mockExec := NewMockExec(t)
+	cmd := NewSyncCommand(rsyncPath, "/logs/base", mockExec)
+
+	assert.Equal(t, rsyncPath, cmd.BinPath)
+	assert.Equal(t, "/logs/base", cmd.BaseLogPath)
+	assert.Equal(t, mockExec, cmd.Shell)
+}
+
+func TestSyncCommand_Run_Success(t *testing.T) {
+	mockExec := NewMockExec(t)
+	cmd := NewSyncCommand(rsyncPath, "/logs/base", mockExec)
+	job := newTestJob()
+
+	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
+		Return([]byte("sync output"), nil).Once()
+
+	status := cmd.Run(job)
+
+	assert.Equal(t, Success, status)
+}
+
+func TestSyncCommand_Run_Failure(t *testing.T) {
+	mockExec := NewMockExec(t)
+	cmd := NewSyncCommand(rsyncPath, "/logs/base", mockExec)
+	job := newTestJob()
+
+	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
+		Return(nil, errCommandNotFound).Once()
+
+	status := cmd.Run(job)
+
+	assert.Equal(t, Failure, status)
+}
+
+func TestNewSimulateCommand(t *testing.T) {
+	mockExec := NewMockExec(t)
+	cmd := NewSimulateCommand(rsyncPath, "/logs/base", mockExec)
+
+	assert.Equal(t, rsyncPath, cmd.BinPath)
+	assert.Equal(t, "/logs/base", cmd.BaseLogPath)
+	assert.Equal(t, mockExec, cmd.Shell)
+}
+
+func TestSimulateCommand_Run_Success(t *testing.T) {
+	mockExec := NewMockExec(t)
+	logDir := t.TempDir()
+	cmd := NewSimulateCommand(rsyncPath, logDir, mockExec)
+	job := newTestJob()
+
+	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
+		Return([]byte("simulated output"), nil).Once()
+
+	status := cmd.Run(job)
+
+	assert.Equal(t, Success, status)
+}
+
+func TestSimulateCommand_Run_Failure(t *testing.T) {
+	mockExec := NewMockExec(t)
+	logDir := t.TempDir()
+	cmd := NewSimulateCommand(rsyncPath, logDir, mockExec)
+	job := newTestJob()
+
+	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
+		Return(nil, errCommandNotFound).Once()
+
+	status := cmd.Run(job)
+
+	assert.Equal(t, Failure, status)
+}
