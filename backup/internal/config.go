@@ -18,6 +18,7 @@ var (
 	ErrInvalidPath     = errors.New("invalid path")
 	ErrPathValidation  = errors.New("path validation failed")
 	ErrOverlappingPath = errors.New("overlapping path detected")
+	ErrJobFailure      = errors.New("one or more jobs failed")
 )
 
 // Config represents the overall backup configuration.
@@ -37,7 +38,7 @@ func (cfg Config) String() string {
 	return string(out)
 }
 
-func (cfg Config) Apply(rsync JobCommand, logger *log.Logger, output io.Writer) {
+func (cfg Config) Apply(rsync JobCommand, logger *log.Logger, output io.Writer) error {
 	versionInfo, fullpath, err := rsync.GetVersionInfo()
 	if err != nil {
 		logger.Printf("Failed to fetch rsync version: %v", err)
@@ -46,11 +47,32 @@ func (cfg Config) Apply(rsync JobCommand, logger *log.Logger, output io.Writer) 
 		logger.Printf("Rsync Version Info: %s", versionInfo)
 	}
 
+	var succeeded, failed, skipped int
+
 	for _, job := range cfg.Jobs {
 		status := job.Apply(rsync)
 		logger.Printf("STATUS [%s]: %s", job.Name, status)
 		fmt.Fprintf(output, "Status [%s]: %s\n", job.Name, status)
+
+		switch status {
+		case Success:
+			succeeded++
+		case Failure:
+			failed++
+		case Skipped:
+			skipped++
+		}
 	}
+
+	summary := fmt.Sprintf("Summary: %d succeeded, %d failed, %d skipped", succeeded, failed, skipped)
+	logger.Print(summary)
+	fmt.Fprintln(output, summary)
+
+	if failed > 0 {
+		return fmt.Errorf("%w: %d of %d jobs", ErrJobFailure, failed, len(cfg.Jobs))
+	}
+
+	return nil
 }
 
 func LoadConfig(reader io.Reader) (Config, error) {

@@ -31,9 +31,7 @@ func buildSimulateCommand(shell internal.Exec) *cobra.Command {
 			out := cmd.OutOrStdout()
 			command := internal.NewSimulateCommand(rsyncPath, logPath, shell, out)
 
-			cfg.Apply(command, logger, out)
-
-			return nil
+			return cfg.Apply(command, logger, out)
 		},
 	}
 }

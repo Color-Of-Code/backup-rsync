@@ -26,9 +26,8 @@ func buildListCommand(shell internal.Exec) *cobra.Command {
 			command := internal.NewListCommand(rsyncPath, shell, out)
 
 			logger := log.New(io.Discard, "", 0)
-			cfg.Apply(command, logger, out)
 
-			return nil
+			return cfg.Apply(command, logger, out)
 		},
 	}
 }
