@@ -1,10 +1,15 @@
 package cmd
 
 import (
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
 func BuildRootCommand() *cobra.Command {
+	return BuildRootCommandWithFs(afero.NewOsFs())
+}
+
+func BuildRootCommandWithFs(fs afero.Fs) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "backup",
 		Short: "A tool for managing backups",
@@ -19,7 +24,7 @@ func BuildRootCommand() *cobra.Command {
 		buildRunCommand(),
 		buildSimulateCommand(),
 		buildConfigCommand(),
-		buildCheckCoverageCommand(),
+		buildCheckCoverageCommand(fs),
 		buildVersionCommand(),
 	)
 

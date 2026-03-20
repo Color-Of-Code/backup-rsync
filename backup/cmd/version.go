@@ -22,8 +22,9 @@ func buildVersionCommand() *cobra.Command {
 				return fmt.Errorf("getting version info: %w", err)
 			}
 
-			fmt.Printf("Rsync Binary Path: %s\n", rsyncPath)
-			fmt.Printf("Version Info: %s", output)
+			out := cmd.OutOrStdout()
+			fmt.Fprintf(out, "Rsync Binary Path: %s\n", rsyncPath)
+			fmt.Fprintf(out, "Version Info: %s", output)
 
 			return nil
 		},

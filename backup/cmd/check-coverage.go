@@ -11,9 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func buildCheckCoverageCommand() *cobra.Command {
-	var fs = afero.NewOsFs()
-
+func buildCheckCoverageCommand(fs afero.Fs) *cobra.Command {
 	return &cobra.Command{
 		Use:   "check-coverage",
 		Short: "Check path coverage",
@@ -32,10 +30,11 @@ func buildCheckCoverageCommand() *cobra.Command {
 
 			uncoveredPaths := checker.ListUncoveredPaths(cfg)
 
-			fmt.Println("Uncovered paths:")
+			out := cmd.OutOrStdout()
+			fmt.Fprintln(out, "Uncovered paths:")
 
 			for _, path := range uncoveredPaths {
-				fmt.Println(path)
+				fmt.Fprintln(out, path)
 			}
 
 			return nil

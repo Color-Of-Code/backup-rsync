@@ -24,7 +24,7 @@ func buildConfigCommand() *cobra.Command {
 				return fmt.Errorf("loading config: %w", err)
 			}
 
-			fmt.Printf("Resolved Configuration:\n%s\n", cfg)
+			fmt.Fprintf(cmd.OutOrStdout(), "Resolved Configuration:\n%s\n", cfg)
 
 			return nil
 		},
@@ -41,7 +41,7 @@ func buildConfigCommand() *cobra.Command {
 				return fmt.Errorf("validating config: %w", err)
 			}
 
-			fmt.Println("Configuration is valid.")
+			fmt.Fprintln(cmd.OutOrStdout(), "Configuration is valid.")
 
 			return nil
 		},
