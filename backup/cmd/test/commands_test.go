@@ -189,15 +189,12 @@ jobs:
     target: "/backup/docs/"
 `)
 
-	// Block log directory creation by placing a file named "logs"
-	tmpDir := t.TempDir()
-	t.Chdir(tmpDir)
-
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "logs"), []byte("block"), 0600))
+	// Use a read-only filesystem to block log directory creation
+	fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
 
 	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
 
-	_, err := executeCommandWithDeps(t, afero.NewMemMapFs(), shell, "run", "--config", cfgPath)
+	_, err := executeCommandWithDeps(t, fs, shell, "run", "--config", cfgPath)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "creating logger")
@@ -246,14 +243,12 @@ jobs:
     target: "/backup/docs/"
 `)
 
-	tmpDir := t.TempDir()
-	t.Chdir(tmpDir)
-
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "logs"), []byte("block"), 0600))
+	// Use a read-only filesystem to block log directory creation
+	fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
 
 	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
 
-	_, err := executeCommandWithDeps(t, afero.NewMemMapFs(), shell, "simulate", "--config", cfgPath)
+	_, err := executeCommandWithDeps(t, fs, shell, "simulate", "--config", cfgPath)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "creating logger")

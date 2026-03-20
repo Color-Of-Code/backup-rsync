@@ -30,8 +30,8 @@ func BuildRootCommandWithDeps(fs afero.Fs, shell internal.Exec) *cobra.Command {
 
 	rootCmd.AddCommand(
 		buildListCommand(shell),
-		buildRunCommand(shell),
-		buildSimulateCommand(shell),
+		buildRunCommand(fs, shell),
+		buildSimulateCommand(fs, shell),
 		buildConfigCommand(),
 		buildCheckCoverageCommand(fs),
 		buildVersionCommand(shell),

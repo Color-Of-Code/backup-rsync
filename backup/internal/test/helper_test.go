@@ -1,12 +1,12 @@
 package internal_test
 
 import (
-	"os"
 	"testing"
 	"time"
 
 	. "backup-rsync/backup/internal"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,7 +33,7 @@ func fixedTime() time.Time {
 }
 
 func TestCreateMainLogger_Title_IsPresent(t *testing.T) {
-	logger, logPath, cleanup, err := CreateMainLogger("title", true, fixedTime())
+	logger, logPath, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), "title", true, fixedTime())
 	require.NoError(t, err)
 
 	defer cleanup()
@@ -43,7 +43,7 @@ func TestCreateMainLogger_Title_IsPresent(t *testing.T) {
 }
 
 func TestCreateMainLogger_IsSimulate_HasSimSuffix(t *testing.T) {
-	logger, logPath, cleanup, err := CreateMainLogger("", true, fixedTime())
+	logger, logPath, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), "", true, fixedTime())
 	require.NoError(t, err)
 
 	defer cleanup()
@@ -53,7 +53,7 @@ func TestCreateMainLogger_IsSimulate_HasSimSuffix(t *testing.T) {
 }
 
 func TestCreateMainLogger_NotSimulate_HasNoSimSuffix(t *testing.T) {
-	logger, logPath, cleanup, err := CreateMainLogger("", false, fixedTime())
+	logger, logPath, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), "", false, fixedTime())
 	require.NoError(t, err)
 
 	defer cleanup()
@@ -63,7 +63,7 @@ func TestCreateMainLogger_NotSimulate_HasNoSimSuffix(t *testing.T) {
 }
 
 func TestCreateMainLogger_DeterministicLogPath(t *testing.T) {
-	_, logPath, cleanup, err := CreateMainLogger("backup.yaml", true, fixedTime())
+	_, logPath, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), "backup.yaml", true, fixedTime())
 	require.NoError(t, err)
 
 	defer cleanup()
@@ -72,7 +72,7 @@ func TestCreateMainLogger_DeterministicLogPath(t *testing.T) {
 }
 
 func TestCreateMainLogger_DeterministicLogPath_NoSimulate(t *testing.T) {
-	_, logPath, cleanup, err := CreateMainLogger("sync.yaml", false, fixedTime())
+	_, logPath, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), "sync.yaml", false, fixedTime())
 	require.NoError(t, err)
 
 	defer cleanup()
@@ -81,15 +81,10 @@ func TestCreateMainLogger_DeterministicLogPath_NoSimulate(t *testing.T) {
 }
 
 func TestCreateMainLogger_MkdirError(t *testing.T) {
-	// Use t.Chdir to a temp dir so we control the filesystem
-	tmpDir := t.TempDir()
-	t.Chdir(tmpDir)
+	// Use a read-only filesystem to block directory creation
+	fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
 
-	// Create "logs" as a regular file to block MkdirAll
-	err := os.WriteFile("logs", []byte("block"), 0600)
-	require.NoError(t, err)
-
-	_, _, cleanup, err := CreateMainLogger("test.yaml", false, fixedTime())
+	_, _, cleanup, err := CreateMainLogger(fs, "test.yaml", false, fixedTime())
 	_ = cleanup
 
 	require.Error(t, err)
@@ -97,18 +92,11 @@ func TestCreateMainLogger_MkdirError(t *testing.T) {
 }
 
 func TestCreateMainLogger_OpenFileError(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Chdir(tmpDir)
+	fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
 
-	// Pre-create the log path directory and make summary.log a directory to block OpenFile
-	logDir := "logs/sync-2025-06-15T14-30-45-test"
-
-	err := os.MkdirAll(logDir+"/summary.log", 0750)
-	require.NoError(t, err)
-
-	_, _, cleanup, err := CreateMainLogger("test.yaml", false, fixedTime())
+	_, _, cleanup, err := CreateMainLogger(fs, "test.yaml", false, fixedTime())
 	_ = cleanup
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to open overall log file")
+	assert.Contains(t, err.Error(), "failed to create log directory")
 }

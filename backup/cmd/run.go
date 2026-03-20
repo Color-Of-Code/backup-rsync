@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
-func buildRunCommand(shell internal.Exec) *cobra.Command {
+func buildRunCommand(fs afero.Fs, shell internal.Exec) *cobra.Command {
 	return &cobra.Command{
 		Use:   "run",
 		Short: "Execute the sync jobs",
@@ -21,7 +22,7 @@ func buildRunCommand(shell internal.Exec) *cobra.Command {
 				return fmt.Errorf("loading config: %w", err)
 			}
 
-			logger, logPath, cleanup, err := internal.CreateMainLogger(configPath, false, time.Now())
+			logger, logPath, cleanup, err := internal.CreateMainLogger(fs, configPath, false, time.Now())
 			if err != nil {
 				return fmt.Errorf("creating logger: %w", err)
 			}

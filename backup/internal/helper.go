@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/spf13/afero"
 )
 
 // Path represents a source or target path with optional exclusions.
@@ -35,16 +37,18 @@ func getLogPath(simulate bool, configPath string, now time.Time) string {
 	return logPath
 }
 
-func CreateMainLogger(configPath string, simulate bool, now time.Time) (*log.Logger, string, func() error, error) {
+func CreateMainLogger(
+	fs afero.Fs, configPath string, simulate bool, now time.Time,
+) (*log.Logger, string, func() error, error) {
 	logPath := getLogPath(simulate, configPath, now)
 	overallLogPath := logPath + "/summary.log"
 
-	err := os.MkdirAll(logPath, LogDirPermission)
+	err := fs.MkdirAll(logPath, LogDirPermission)
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
 
-	overallLogFile, err := os.OpenFile(overallLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, LogFilePermission)
+	overallLogFile, err := fs.OpenFile(overallLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, LogFilePermission)
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("failed to open overall log file: %w", err)
 	}
