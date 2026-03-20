@@ -40,3 +40,6 @@ jobs:
 
     - name: Test
       run: make test
+
+    - name: Check coverage
+      run: make check-coverage

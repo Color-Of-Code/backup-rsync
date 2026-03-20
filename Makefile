@@ -3,8 +3,9 @@
 # Build command with common flags
 BUILD_CMD = CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -tags=prod
 PACKAGE = ./backup/main.go
+COVERAGE_THRESHOLD = 90
 
-.PHONY: build clean test lint tidy checksums release sanity-check check-mod-tidy lint-config-check  lint-fix format check-clean
+.PHONY: build clean test lint tidy checksums release sanity-check check-mod-tidy lint-config-check  lint-fix format check-clean check-coverage
 
 format:
 	go fmt ./...
@@ -72,6 +73,17 @@ release: release-linux-amd64 release-darwin-amd64 release-windows-amd64 checksum
 report-size: build
 	go install github.com/Zxilly/go-size-analyzer/cmd/gsa@latest
 	gsa --web --listen=":8910" --open dist/backup
+
+check-coverage:
+	@go test ./... -count=1 -coverprofile=/tmp/coverage.out -coverpkg=./backup/...
+	@COVERAGE=$$(go tool cover -func=/tmp/coverage.out | grep '^total:' | awk '{print int($$3)}'); \
+	echo "Total coverage: $${COVERAGE}%"; \
+	if [ "$${COVERAGE}" -lt "$(COVERAGE_THRESHOLD)" ]; then \
+		echo "FAIL: Coverage $${COVERAGE}% is below threshold $(COVERAGE_THRESHOLD)%"; \
+		exit 1; \
+	else \
+		echo "OK: Coverage $${COVERAGE}% meets threshold $(COVERAGE_THRESHOLD)%"; \
+	fi
 
 report-coverage:
 	@mkdir -p coverage
