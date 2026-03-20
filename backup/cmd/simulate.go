@@ -3,6 +3,7 @@ package cmd
 import (
 	"backup-rsync/backup/internal"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -20,7 +21,7 @@ func buildSimulateCommand(shell internal.Exec) *cobra.Command {
 				return fmt.Errorf("loading config: %w", err)
 			}
 
-			logger, logPath, err := internal.CreateMainLogger(configPath, true)
+			logger, logPath, err := internal.CreateMainLogger(configPath, true, time.Now())
 			if err != nil {
 				return fmt.Errorf("creating logger: %w", err)
 			}
