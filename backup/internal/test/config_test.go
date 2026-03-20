@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"bytes"
-	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -518,12 +517,12 @@ func TestConfigApply_VersionInfoError(t *testing.T) {
 		},
 	}
 
-	mockCmd.EXPECT().GetVersionInfo().Return("", "", errors.New("not found")).Once()
+	mockCmd.EXPECT().GetVersionInfo().Return("", "", errCommandNotFound).Once()
 	mockCmd.EXPECT().Run(mock.AnythingOfType("internal.Job")).Return(Failure).Once()
 
 	cfg.Apply(mockCmd, logger, &output)
 
-	assert.Contains(t, logBuf.String(), "Failed to fetch rsync version: not found")
+	assert.Contains(t, logBuf.String(), "Failed to fetch rsync version: command not found")
 	assert.NotContains(t, logBuf.String(), "Rsync Binary Path")
 	assert.Contains(t, logBuf.String(), "STATUS [backup]: FAILURE")
 	assert.Contains(t, output.String(), "Status [backup]: FAILURE")

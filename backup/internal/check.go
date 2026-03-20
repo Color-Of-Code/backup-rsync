@@ -10,7 +10,42 @@ import (
 	"github.com/spf13/afero"
 )
 
-func isExcluded(path string, job Job) bool {
+// CoverageChecker analyzes path coverage against a configuration.
+type CoverageChecker struct {
+	Logger *log.Logger
+	Fs     afero.Fs
+}
+
+func (c *CoverageChecker) IsExcludedGlobally(path string, sources []Path) bool {
+	for _, source := range sources {
+		for _, exclusion := range source.Exclusions {
+			exclusionPath := filepath.Join(source.Path, exclusion)
+			if strings.HasPrefix(NormalizePath(path), exclusionPath) {
+				c.Logger.Printf("EXCLUDED: Path '%s' is globally excluded by '%s' in source '%s'", path, exclusion, source.Path)
+
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (c *CoverageChecker) ListUncoveredPaths(cfg Config) []string {
+	var result []string
+
+	seen := make(map[string]bool)
+
+	for _, source := range cfg.Sources {
+		c.checkPath(source.Path, cfg, &result, seen)
+	}
+
+	sort.Strings(result) // Ensure consistent ordering for test comparison
+
+	return result
+}
+
+func (c *CoverageChecker) isExcluded(path string, job Job) bool {
 	for _, exclusion := range job.Exclusions {
 		exclusionPath := filepath.Join(job.Source, exclusion)
 		if strings.HasPrefix(NormalizePath(path), exclusionPath) {
@@ -21,30 +56,15 @@ func isExcluded(path string, job Job) bool {
 	return false
 }
 
-func IsExcludedGlobally(path string, sources []Path) bool {
-	for _, source := range sources {
-		for _, exclusion := range source.Exclusions {
-			exclusionPath := filepath.Join(source.Path, exclusion)
-			if strings.HasPrefix(NormalizePath(path), exclusionPath) {
-				log.Printf("EXCLUDED: Path '%s' is globally excluded by '%s' in source '%s'", path, exclusion, source.Path)
-
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func isCoveredByJob(path string, job Job) bool {
+func (c *CoverageChecker) isCoveredByJob(path string, job Job) bool {
 	if NormalizePath(job.Source) == NormalizePath(path) {
-		log.Printf("COVERED: Path '%s' is covered by job '%s'", path, job.Name)
+		c.Logger.Printf("COVERED: Path '%s' is covered by job '%s'", path, job.Name)
 
 		return true
 	}
 
-	if isExcluded(path, job) {
-		log.Printf("EXCLUDED: Path '%s' is excluded by job '%s'", path, job.Name)
+	if c.isExcluded(path, job) {
+		c.Logger.Printf("EXCLUDED: Path '%s' is excluded by job '%s'", path, job.Name)
 
 		return true
 	}
@@ -52,9 +72,9 @@ func isCoveredByJob(path string, job Job) bool {
 	return false
 }
 
-func isCovered(path string, jobs []Job) bool {
+func (c *CoverageChecker) isCovered(path string, jobs []Job) bool {
 	for _, job := range jobs {
-		if isCoveredByJob(path, job) {
+		if c.isCoveredByJob(path, job) {
 			return true
 		}
 	}
@@ -62,23 +82,9 @@ func isCovered(path string, jobs []Job) bool {
 	return false
 }
 
-func ListUncoveredPaths(fs afero.Fs, cfg Config) []string {
-	var result []string
-
-	seen := make(map[string]bool)
-
-	for _, source := range cfg.Sources {
-		checkPath(fs, source.Path, cfg, &result, seen)
-	}
-
-	sort.Strings(result) // Ensure consistent ordering for test comparison
-
-	return result
-}
-
-func checkPath(fs afero.Fs, path string, cfg Config, result *[]string, seen map[string]bool) {
+func (c *CoverageChecker) checkPath(path string, cfg Config, result *[]string, seen map[string]bool) {
 	if seen[path] {
-		log.Printf("SKIP: Path '%s' already seen", path)
+		c.Logger.Printf("SKIP: Path '%s' already seen", path)
 
 		return
 	}
@@ -86,42 +92,43 @@ func checkPath(fs afero.Fs, path string, cfg Config, result *[]string, seen map[
 	seen[path] = true
 
 	// Skip if globally excluded
-	if IsExcludedGlobally(path, cfg.Sources) {
-		log.Printf("SKIP: Path '%s' is globally excluded", path)
+	if c.IsExcludedGlobally(path, cfg.Sources) {
+		c.Logger.Printf("SKIP: Path '%s' is globally excluded", path)
 
 		return
 	}
 
 	// Skip if covered by a job
-	if isCovered(path, cfg.Jobs) {
-		log.Printf("SKIP: Path '%s' is covered by a job", path)
+	if c.isCovered(path, cfg.Jobs) {
+		c.Logger.Printf("SKIP: Path '%s' is covered by a job", path)
 
 		return
 	}
 
 	// Check if it's effectively covered through descendants
-	if isEffectivelyCovered(fs, path, cfg) {
-		log.Printf("SKIP: Path '%s' is effectively covered", path)
+	if c.isEffectivelyCovered(path, cfg) {
+		c.Logger.Printf("SKIP: Path '%s' is effectively covered", path)
 
 		return
 	}
 
 	// Add uncovered path
-	log.Printf("ADD: Path '%s' is uncovered", path)
+	c.Logger.Printf("ADD: Path '%s' is uncovered", path)
 	*result = append(*result, path)
 }
 
-// Check if a directory is effectively covered (all its descendants are covered or excluded).
-func isEffectivelyCovered(fs afero.Fs, path string, cfg Config) bool {
-	children, err := getChildDirectories(fs, path)
+// isEffectivelyCovered checks if a directory is effectively covered
+// (all its descendants are covered or excluded).
+func (c *CoverageChecker) isEffectivelyCovered(path string, cfg Config) bool {
+	children, err := getChildDirectories(c.Fs, path)
 	if err != nil {
-		log.Printf("ERROR: could not get child directories of '%s': %v", path, err)
+		c.Logger.Printf("ERROR: could not get child directories of '%s': %v", path, err)
 
 		return false
 	}
 
 	if len(children) == 0 {
-		log.Printf("NOT COVERED: Path '%s' has no children", path)
+		c.Logger.Printf("NOT COVERED: Path '%s' has no children", path)
 
 		return false // Leaf directories are not effectively covered unless directly covered
 	}
@@ -129,15 +136,15 @@ func isEffectivelyCovered(fs afero.Fs, path string, cfg Config) bool {
 	allCovered := true
 
 	for _, child := range children {
-		if !IsExcludedGlobally(child, cfg.Sources) && !isCovered(child, cfg.Jobs) && !isEffectivelyCovered(fs, child, cfg) {
-			log.Printf("UNCOVERED CHILD: Path '%s' has uncovered child '%s'", path, child)
+		if !c.IsExcludedGlobally(child, cfg.Sources) && !c.isCovered(child, cfg.Jobs) && !c.isEffectivelyCovered(child, cfg) {
+			c.Logger.Printf("UNCOVERED CHILD: Path '%s' has uncovered child '%s'", path, child)
 
 			allCovered = false
 		}
 	}
 
 	if allCovered {
-		log.Printf("COVERED: Path '%s' is effectively covered", path)
+		c.Logger.Printf("COVERED: Path '%s' is effectively covered", path)
 	}
 
 	return allCovered

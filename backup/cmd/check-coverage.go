@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"log"
+	"os"
 
 	"backup-rsync/backup/internal"
 
@@ -23,7 +25,12 @@ func buildCheckCoverageCommand() *cobra.Command {
 				return fmt.Errorf("loading config: %w", err)
 			}
 
-			uncoveredPaths := internal.ListUncoveredPaths(fs, cfg)
+			checker := &internal.CoverageChecker{
+				Logger: log.New(os.Stderr, "", log.LstdFlags),
+				Fs:     fs,
+			}
+
+			uncoveredPaths := checker.ListUncoveredPaths(cfg)
 
 			fmt.Println("Uncovered paths:")
 

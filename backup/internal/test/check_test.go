@@ -2,6 +2,7 @@ package internal_test
 
 import (
 	"bytes"
+	"io"
 	"log"
 	"path/filepath"
 	"sort"
@@ -12,6 +13,20 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
+
+func newTestChecker(fs afero.Fs, logBuf *bytes.Buffer) *CoverageChecker {
+	return &CoverageChecker{
+		Logger: log.New(logBuf, "", 0),
+		Fs:     fs,
+	}
+}
+
+func newSilentChecker(fs afero.Fs) *CoverageChecker {
+	return &CoverageChecker{
+		Logger: log.New(io.Discard, "", 0),
+		Fs:     fs,
+	}
+}
 
 func TestIsExcludedGlobally_PathGloballyExcluded(t *testing.T) {
 	sources := []Path{
@@ -26,14 +41,14 @@ func TestIsExcludedGlobally_PathGloballyExcluded(t *testing.T) {
 	}
 
 	var logBuffer bytes.Buffer
-	log.SetOutput(&logBuffer)
+
+	checker := newTestChecker(nil, &logBuffer)
 
 	path := "/home/data/projects/P1"
-	expectsError := true
 	expectedLog := "Path '/home/data/projects/P1' is globally excluded by '/projects/P1/' in source '/home/data/'"
 
-	result := IsExcludedGlobally(path, sources)
-	assert.Equal(t, expectsError, result)
+	result := checker.IsExcludedGlobally(path, sources)
+	assert.True(t, result)
 	assert.Contains(t, logBuffer.String(), expectedLog)
 }
 
@@ -49,14 +64,12 @@ func TestIsExcludedGlobally_PathNotExcluded(t *testing.T) {
 		},
 	}
 
-	var logBuffer bytes.Buffer
-	log.SetOutput(&logBuffer)
+	checker := newSilentChecker(nil)
 
 	path := "/home/data/projects/Other"
-	expectsError := false
 
-	result := IsExcludedGlobally(path, sources)
-	assert.Equal(t, expectsError, result)
+	result := checker.IsExcludedGlobally(path, sources)
+	assert.False(t, result)
 }
 
 func TestIsExcludedGlobally_PathExcludedInAnotherSource(t *testing.T) {
@@ -72,14 +85,14 @@ func TestIsExcludedGlobally_PathExcludedInAnotherSource(t *testing.T) {
 	}
 
 	var logBuffer bytes.Buffer
-	log.SetOutput(&logBuffer)
+
+	checker := newTestChecker(nil, &logBuffer)
 
 	path := "/home/user/cache"
-	expectsError := true
 	expectedLog := "Path '/home/user/cache' is globally excluded by '/cache/' in source '/home/user/'"
 
-	result := IsExcludedGlobally(path, sources)
-	assert.Equal(t, expectsError, result)
+	result := checker.IsExcludedGlobally(path, sources)
+	assert.True(t, result)
 	assert.Contains(t, logBuffer.String(), expectedLog)
 }
 
@@ -102,8 +115,10 @@ func runListUncoveredPathsTest(
 		}
 	}
 
+	checker := newSilentChecker(fs)
+
 	// Call the function
-	uncoveredPaths := ListUncoveredPaths(fs, cfg)
+	uncoveredPaths := checker.ListUncoveredPaths(cfg)
 
 	// Assertions
 	sort.Strings(uncoveredPaths)
