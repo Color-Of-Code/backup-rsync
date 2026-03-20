@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"backup-rsync/backup/internal"
 
@@ -14,7 +15,7 @@ func buildVersionCommand() *cobra.Command {
 		Short: "Prints the rsync version, protocol version, and full path to the rsync binary.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			rsyncPath, _ := cmd.Flags().GetString("rsync-path")
-			rsync := internal.NewSyncCommand(rsyncPath, "", &internal.OsExec{})
+			rsync := internal.NewSyncCommand(rsyncPath, "", &internal.OsExec{}, os.Stdout)
 
 			output, _, err := rsync.GetVersionInfo()
 			if err != nil {

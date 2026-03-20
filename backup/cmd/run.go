@@ -3,6 +3,7 @@ package cmd
 import (
 	"backup-rsync/backup/internal"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -25,9 +26,9 @@ func buildRunCommand() *cobra.Command {
 				return fmt.Errorf("creating logger: %w", err)
 			}
 
-			command := internal.NewSyncCommand(rsyncPath, logPath, &internal.OsExec{})
+			command := internal.NewSyncCommand(rsyncPath, logPath, &internal.OsExec{}, os.Stdout)
 
-			cfg.Apply(command, logger)
+			cfg.Apply(command, logger, os.Stdout)
 
 			return nil
 		},

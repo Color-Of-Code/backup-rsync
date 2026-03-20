@@ -34,7 +34,7 @@ func (cfg Config) String() string {
 	return string(out)
 }
 
-func (cfg Config) Apply(rsync JobCommand, logger *log.Logger) {
+func (cfg Config) Apply(rsync JobCommand, logger *log.Logger, output io.Writer) {
 	versionInfo, fullpath, err := rsync.GetVersionInfo()
 	if err != nil {
 		logger.Printf("Failed to fetch rsync version: %v", err)
@@ -46,7 +46,7 @@ func (cfg Config) Apply(rsync JobCommand, logger *log.Logger) {
 	for _, job := range cfg.Jobs {
 		status := job.Apply(rsync)
 		logger.Printf("STATUS [%s]: %s", job.Name, status)
-		fmt.Printf("Status [%s]: %s\n", job.Name, status)
+		fmt.Fprintf(output, "Status [%s]: %s\n", job.Name, status)
 	}
 }
 

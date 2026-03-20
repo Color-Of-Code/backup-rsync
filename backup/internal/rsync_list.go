@@ -1,12 +1,14 @@
 package internal
 
+import "io"
+
 type ListCommand struct {
 	SharedCommand
 }
 
-func NewListCommand(binPath string, shell Exec) ListCommand {
+func NewListCommand(binPath string, shell Exec, output io.Writer) ListCommand {
 	return ListCommand{
-		SharedCommand: NewSharedCommand(binPath, "", shell),
+		SharedCommand: NewSharedCommand(binPath, "", shell, output),
 	}
 }
 

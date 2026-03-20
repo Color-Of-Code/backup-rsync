@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -22,10 +23,10 @@ func buildListCommand() *cobra.Command {
 				return fmt.Errorf("loading config: %w", err)
 			}
 
-			command := internal.NewListCommand(rsyncPath, &internal.OsExec{})
+			command := internal.NewListCommand(rsyncPath, &internal.OsExec{}, os.Stdout)
 
 			logger := log.New(io.Discard, "", 0)
-			cfg.Apply(command, logger)
+			cfg.Apply(command, logger, os.Stdout)
 
 			return nil
 		},

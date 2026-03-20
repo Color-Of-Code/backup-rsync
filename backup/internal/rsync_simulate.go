@@ -1,12 +1,14 @@
 package internal
 
+import "io"
+
 type SimulateCommand struct {
 	SharedCommand
 }
 
-func NewSimulateCommand(binPath string, logPath string, shell Exec) SimulateCommand {
+func NewSimulateCommand(binPath string, logPath string, shell Exec, output io.Writer) SimulateCommand {
 	return SimulateCommand{
-		SharedCommand: NewSharedCommand(binPath, logPath, shell),
+		SharedCommand: NewSharedCommand(binPath, logPath, shell, output),
 	}
 }
 

@@ -2,7 +2,9 @@ package internal_test
 
 import (
 	. "backup-rsync/backup/internal"
+	"bytes"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -57,6 +59,7 @@ func TestGetVersionInfo_Success(t *testing.T) {
 	rsync := SharedCommand{
 		BinPath: rsyncPath,
 		Shell:   mockExec,
+		Output:  io.Discard,
 	}
 
 	// Set expectation for Execute call
@@ -76,6 +79,7 @@ func TestGetVersionInfo_CommandError(t *testing.T) {
 	rsync := SharedCommand{
 		BinPath: rsyncPath,
 		Shell:   mockExec,
+		Output:  io.Discard,
 	}
 
 	// Set expectation for Execute call to return error
@@ -95,6 +99,7 @@ func TestGetVersionInfo_InvalidOutput(t *testing.T) {
 	rsync := SharedCommand{
 		BinPath: rsyncPath,
 		Shell:   mockExec,
+		Output:  io.Discard,
 	}
 
 	// Set expectation for Execute call to return invalid output
@@ -114,6 +119,7 @@ func TestGetVersionInfo_EmptyPath(t *testing.T) {
 	rsync := SharedCommand{
 		BinPath: "",
 		Shell:   mockExec,
+		Output:  io.Discard,
 	}
 
 	// No expectations set - should fail before calling Execute due to path validation
@@ -131,6 +137,7 @@ func TestGetVersionInfo_IncompletePath(t *testing.T) {
 	rsync := SharedCommand{
 		BinPath: "bin/rsync",
 		Shell:   mockExec,
+		Output:  io.Discard,
 	}
 
 	// No expectations set - should fail before calling Execute due to path validation
@@ -156,15 +163,16 @@ func newTestJob() Job {
 
 func TestNewSharedCommand(t *testing.T) {
 	mockExec := NewMockExec(t)
-	cmd := NewSharedCommand(rsyncPath, "/logs/base", mockExec)
+	cmd := NewSharedCommand(rsyncPath, "/logs/base", mockExec, io.Discard)
 
 	assert.Equal(t, rsyncPath, cmd.BinPath)
 	assert.Equal(t, "/logs/base", cmd.BaseLogPath)
 	assert.Equal(t, mockExec, cmd.Shell)
+	assert.Equal(t, io.Discard, cmd.Output)
 }
 
 func TestJobLogPath(t *testing.T) {
-	cmd := NewSharedCommand(rsyncPath, "/logs/sync-2025", nil)
+	cmd := NewSharedCommand(rsyncPath, "/logs/sync-2025", nil, io.Discard)
 	job := newTestJob()
 
 	logPath := cmd.JobLogPath(job)
@@ -174,7 +182,7 @@ func TestJobLogPath(t *testing.T) {
 
 func TestNewListCommand(t *testing.T) {
 	mockExec := NewMockExec(t)
-	cmd := NewListCommand(rsyncPath, mockExec)
+	cmd := NewListCommand(rsyncPath, mockExec, io.Discard)
 
 	assert.Equal(t, rsyncPath, cmd.BinPath)
 	assert.Empty(t, cmd.BaseLogPath)
@@ -183,18 +191,22 @@ func TestNewListCommand(t *testing.T) {
 
 func TestListCommand_Run_ReturnsSuccess(t *testing.T) {
 	mockExec := NewMockExec(t)
-	cmd := NewListCommand(rsyncPath, mockExec)
+
+	var buf bytes.Buffer
+
+	cmd := NewListCommand(rsyncPath, mockExec, &buf)
 	job := newTestJob()
 
-	// ListCommand.Run only prints args, doesn't call Shell.Execute
 	status := cmd.Run(job)
 
 	assert.Equal(t, Success, status)
+	assert.Contains(t, buf.String(), "Job: test-job")
+	assert.Contains(t, buf.String(), rsyncPath)
 }
 
 func TestNewSyncCommand(t *testing.T) {
 	mockExec := NewMockExec(t)
-	cmd := NewSyncCommand(rsyncPath, "/logs/base", mockExec)
+	cmd := NewSyncCommand(rsyncPath, "/logs/base", mockExec, io.Discard)
 
 	assert.Equal(t, rsyncPath, cmd.BinPath)
 	assert.Equal(t, "/logs/base", cmd.BaseLogPath)
@@ -203,7 +215,10 @@ func TestNewSyncCommand(t *testing.T) {
 
 func TestSyncCommand_Run_Success(t *testing.T) {
 	mockExec := NewMockExec(t)
-	cmd := NewSyncCommand(rsyncPath, "/logs/base", mockExec)
+
+	var buf bytes.Buffer
+
+	cmd := NewSyncCommand(rsyncPath, "/logs/base", mockExec, &buf)
 	job := newTestJob()
 
 	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
@@ -212,11 +227,13 @@ func TestSyncCommand_Run_Success(t *testing.T) {
 	status := cmd.Run(job)
 
 	assert.Equal(t, Success, status)
+	assert.Contains(t, buf.String(), "Job: test-job")
+	assert.Contains(t, buf.String(), "Output:\nsync output")
 }
 
 func TestSyncCommand_Run_Failure(t *testing.T) {
 	mockExec := NewMockExec(t)
-	cmd := NewSyncCommand(rsyncPath, "/logs/base", mockExec)
+	cmd := NewSyncCommand(rsyncPath, "/logs/base", mockExec, io.Discard)
 	job := newTestJob()
 
 	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
@@ -229,7 +246,7 @@ func TestSyncCommand_Run_Failure(t *testing.T) {
 
 func TestNewSimulateCommand(t *testing.T) {
 	mockExec := NewMockExec(t)
-	cmd := NewSimulateCommand(rsyncPath, "/logs/base", mockExec)
+	cmd := NewSimulateCommand(rsyncPath, "/logs/base", mockExec, io.Discard)
 
 	assert.Equal(t, rsyncPath, cmd.BinPath)
 	assert.Equal(t, "/logs/base", cmd.BaseLogPath)
@@ -239,7 +256,10 @@ func TestNewSimulateCommand(t *testing.T) {
 func TestSimulateCommand_Run_Success(t *testing.T) {
 	mockExec := NewMockExec(t)
 	logDir := t.TempDir()
-	cmd := NewSimulateCommand(rsyncPath, logDir, mockExec)
+
+	var buf bytes.Buffer
+
+	cmd := NewSimulateCommand(rsyncPath, logDir, mockExec, &buf)
 	job := newTestJob()
 
 	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
@@ -248,12 +268,13 @@ func TestSimulateCommand_Run_Success(t *testing.T) {
 	status := cmd.Run(job)
 
 	assert.Equal(t, Success, status)
+	assert.Contains(t, buf.String(), "Job: test-job")
 }
 
 func TestSimulateCommand_Run_Failure(t *testing.T) {
 	mockExec := NewMockExec(t)
 	logDir := t.TempDir()
-	cmd := NewSimulateCommand(rsyncPath, logDir, mockExec)
+	cmd := NewSimulateCommand(rsyncPath, logDir, mockExec, io.Discard)
 	job := newTestJob()
 
 	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).

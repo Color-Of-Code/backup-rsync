@@ -3,6 +3,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,14 +18,16 @@ type SharedCommand struct {
 	BinPath     string
 	BaseLogPath string
 
-	Shell Exec
+	Shell  Exec
+	Output io.Writer
 }
 
-func NewSharedCommand(binPath string, logPath string, shell Exec) SharedCommand {
+func NewSharedCommand(binPath string, logPath string, shell Exec, output io.Writer) SharedCommand {
 	return SharedCommand{
 		BinPath:     binPath,
 		BaseLogPath: logPath,
 		Shell:       shell,
+		Output:      output,
 	}
 }
 
@@ -33,15 +36,15 @@ func (c SharedCommand) JobLogPath(job Job) string {
 }
 
 func (c SharedCommand) PrintArgs(job Job, args []string) {
-	fmt.Printf("Job: %s\n", job.Name)
-	fmt.Printf("Command: %s %s\n", c.BinPath, strings.Join(args, " "))
+	fmt.Fprintf(c.Output, "Job: %s\n", job.Name)
+	fmt.Fprintf(c.Output, "Command: %s %s\n", c.BinPath, strings.Join(args, " "))
 }
 
 func (c SharedCommand) RunWithArgs(job Job, args []string) JobStatus {
 	c.PrintArgs(job, args)
 
 	out, err := c.Shell.Execute(c.BinPath, args...)
-	fmt.Printf("Output:\n%s\n", string(out))
+	fmt.Fprintf(c.Output, "Output:\n%s\n", string(out))
 
 	if err != nil {
 		return Failure
@@ -59,7 +62,7 @@ func (c SharedCommand) RunWithArgsAndCaptureOutput(job Job, args []string, logPa
 	if logPath != "" {
 		writeErr := os.WriteFile(logPath, out, LogFilePermission)
 		if writeErr != nil {
-			fmt.Printf("Warning: Failed to write output to log file %s: %v\n", logPath, writeErr)
+			fmt.Fprintf(c.Output, "Warning: Failed to write output to log file %s: %v\n", logPath, writeErr)
 		}
 	}
 
