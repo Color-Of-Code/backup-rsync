@@ -29,7 +29,10 @@ type Config struct {
 }
 
 func (cfg Config) String() string {
-	out, _ := yaml.Marshal(cfg)
+	out, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Sprintf("error marshaling config: %v", err)
+	}
 
 	return string(out)
 }
