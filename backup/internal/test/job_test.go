@@ -2,6 +2,7 @@ package internal_test
 
 import (
 	. "backup-rsync/backup/internal"
+	"backup-rsync/backup/internal/testutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,22 +10,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func newJob() Job {
-	return Job{
-		Name:       "job",
-		Source:     "",
-		Target:     "",
-		Delete:     true,
-		Enabled:    true,
-		Exclusions: []string{},
-	}
-}
-
 func TestApply_DisabledJob_ReturnsSkippedAndRunIsNotCalled(t *testing.T) {
 	mockJobCommand := NewMockJobCommand(t)
 
-	disabledJob := newJob()
-	disabledJob.Enabled = false
+	disabledJob := testutil.NewTestJob(testutil.WithEnabled(false))
 
 	// No expectations set - Run should NOT be called for disabled jobs
 
@@ -36,7 +25,7 @@ func TestApply_DisabledJob_ReturnsSkippedAndRunIsNotCalled(t *testing.T) {
 func TestApply_JobFailing_RunIsCalledAndReturnsFailure(t *testing.T) {
 	mockJobCommand := NewMockJobCommand(t)
 
-	job := newJob()
+	job := testutil.NewTestJob()
 
 	// Set expectation that Run will be called and return Failure
 	mockJobCommand.EXPECT().Run(job).Return(Failure).Once()
@@ -49,7 +38,7 @@ func TestApply_JobFailing_RunIsCalledAndReturnsFailure(t *testing.T) {
 func TestApply_JobSucceeds_RunIsCalledAndReturnsSuccess(t *testing.T) {
 	mockJobCommand := NewMockJobCommand(t)
 
-	job := newJob()
+	job := testutil.NewTestJob()
 
 	// Set expectation that Run will be called and return Success
 	mockJobCommand.EXPECT().Run(job).Return(Success).Once()

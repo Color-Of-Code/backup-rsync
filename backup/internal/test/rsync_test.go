@@ -2,6 +2,7 @@ package internal_test
 
 import (
 	. "backup-rsync/backup/internal"
+	"backup-rsync/backup/internal/testutil"
 	"bytes"
 	"errors"
 	"io"
@@ -150,17 +151,6 @@ func TestGetVersionInfo_IncompletePath(t *testing.T) {
 	assert.Empty(t, fullpath)
 }
 
-func newTestJob() Job {
-	return Job{
-		Name:       "test-job",
-		Source:     "/home/user/docs/",
-		Target:     "/backup/user/docs/",
-		Delete:     true,
-		Enabled:    true,
-		Exclusions: []string{"*.tmp"},
-	}
-}
-
 func TestNewSharedCommand(t *testing.T) {
 	mockExec := NewMockExec(t)
 	cmd := NewSharedCommand(rsyncPath, "/logs/base", mockExec, io.Discard)
@@ -173,7 +163,7 @@ func TestNewSharedCommand(t *testing.T) {
 
 func TestJobLogPath(t *testing.T) {
 	cmd := NewSharedCommand(rsyncPath, "/logs/sync-2025", nil, io.Discard)
-	job := newTestJob()
+	job := testutil.NewTestJob()
 
 	logPath := cmd.JobLogPath(job)
 
@@ -195,7 +185,7 @@ func TestListCommand_Run_ReturnsSuccess(t *testing.T) {
 	var buf bytes.Buffer
 
 	cmd := NewListCommand(rsyncPath, mockExec, &buf)
-	job := newTestJob()
+	job := testutil.NewTestJob()
 
 	status := cmd.Run(job)
 
@@ -219,7 +209,7 @@ func TestSyncCommand_Run_Success(t *testing.T) {
 	var buf bytes.Buffer
 
 	cmd := NewSyncCommand(rsyncPath, "/logs/base", mockExec, &buf)
-	job := newTestJob()
+	job := testutil.NewTestJob()
 
 	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
 		Return([]byte("sync output"), nil).Once()
@@ -234,7 +224,7 @@ func TestSyncCommand_Run_Success(t *testing.T) {
 func TestSyncCommand_Run_Failure(t *testing.T) {
 	mockExec := NewMockExec(t)
 	cmd := NewSyncCommand(rsyncPath, "/logs/base", mockExec, io.Discard)
-	job := newTestJob()
+	job := testutil.NewTestJob()
 
 	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
 		Return(nil, errCommandNotFound).Once()
@@ -260,7 +250,7 @@ func TestSimulateCommand_Run_Success(t *testing.T) {
 	var buf bytes.Buffer
 
 	cmd := NewSimulateCommand(rsyncPath, logDir, mockExec, &buf)
-	job := newTestJob()
+	job := testutil.NewTestJob()
 
 	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
 		Return([]byte("simulated output"), nil).Once()
@@ -275,7 +265,7 @@ func TestSimulateCommand_Run_Failure(t *testing.T) {
 	mockExec := NewMockExec(t)
 	logDir := t.TempDir()
 	cmd := NewSimulateCommand(rsyncPath, logDir, mockExec, io.Discard)
-	job := newTestJob()
+	job := testutil.NewTestJob()
 
 	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
 		Return(nil, errCommandNotFound).Once()
@@ -292,7 +282,7 @@ func TestSimulateCommand_Run_LogWriteError(t *testing.T) {
 
 	// Use a non-existent directory so WriteFile fails
 	cmd := NewSimulateCommand(rsyncPath, "/nonexistent/path", mockExec, &buf)
-	job := newTestJob()
+	job := testutil.NewTestJob()
 
 	mockExec.EXPECT().Execute(rsyncPath, mock.AnythingOfType("[]string")).
 		Return([]byte("output"), nil).Once()
