@@ -65,16 +65,10 @@ func executeCommandWithDeps(t *testing.T, fs afero.Fs, shell internal.Exec, args
 // --- config show ---
 
 func TestConfigShow_ValidConfig(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "docs"
-    source: "/home/docs/"
-    target: "/backup/docs/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("docs", "/home/docs/", "/backup/docs/").
+		Build())
 
 	stdout, err := executeCommand(t, "config", "show", "--config", cfgPath)
 
@@ -103,16 +97,10 @@ func TestConfigShow_InvalidYAML(t *testing.T) {
 // --- config validate ---
 
 func TestConfigValidate_ValidConfig(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "docs"
-    source: "/home/docs/"
-    target: "/backup/docs/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("docs", "/home/docs/", "/backup/docs/").
+		Build())
 
 	stdout, err := executeCommand(t, "config", "validate", "--config", cfgPath)
 
@@ -128,19 +116,11 @@ func TestConfigValidate_MissingFile(t *testing.T) {
 }
 
 func TestConfigValidate_DuplicateJobNames(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "same"
-    source: "/home/a/"
-    target: "/backup/a/"
-  - name: "same"
-    source: "/home/b/"
-    target: "/backup/b/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("same", "/home/a/", "/backup/a/").
+		AddJob("same", "/home/b/", "/backup/b/").
+		Build())
 
 	_, err := executeCommand(t, "config", "validate", "--config", cfgPath)
 
@@ -167,16 +147,10 @@ func TestRun_MissingConfig(t *testing.T) {
 }
 
 func TestRun_CreateLoggerError(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "docs"
-    source: "/home/docs/"
-    target: "/backup/docs/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("docs", "/home/docs/", "/backup/docs/").
+		Build())
 
 	// Use a read-only filesystem to block log directory creation
 	fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
@@ -190,17 +164,10 @@ jobs:
 }
 
 func TestRun_ValidConfig(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "docs"
-    source: "/home/docs/"
-    target: "/backup/docs/"
-    enabled: true
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("docs", "/home/docs/", "/backup/docs/", testutil.Enabled(true), testutil.Delete(true)).
+		Build())
 
 	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
 
@@ -221,16 +188,10 @@ func TestSimulate_MissingConfig(t *testing.T) {
 }
 
 func TestSimulate_CreateLoggerError(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "docs"
-    source: "/home/docs/"
-    target: "/backup/docs/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("docs", "/home/docs/", "/backup/docs/").
+		Build())
 
 	// Use a read-only filesystem to block log directory creation
 	fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
@@ -244,17 +205,10 @@ jobs:
 }
 
 func TestSimulate_ValidConfig(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "docs"
-    source: "/home/docs/"
-    target: "/backup/docs/"
-    enabled: true
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("docs", "/home/docs/", "/backup/docs/", testutil.Enabled(true)).
+		Build())
 
 	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
 
@@ -291,16 +245,10 @@ func TestCheckCoverage_MissingConfig(t *testing.T) {
 }
 
 func TestCheckCoverage_WithUncoveredPaths(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/src"
-targets:
-  - path: "/dst"
-jobs:
-  - name: "docs"
-    source: "/src/docs/"
-    target: "/dst/docs/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/src").Target("/dst").
+		AddJob("docs", "/src/docs/", "/dst/docs/").
+		Build())
 
 	fs := afero.NewMemMapFs()
 	_ = fs.MkdirAll("/src/docs", 0755)
@@ -314,16 +262,10 @@ jobs:
 }
 
 func TestCheckCoverage_ValidConfig(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/src"
-targets:
-  - path: "/dst"
-jobs:
-  - name: "docs"
-    source: "/src/docs/"
-    target: "/dst/docs/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/src").Target("/dst").
+		AddJob("docs", "/src/docs/", "/dst/docs/").
+		Build())
 
 	fs := afero.NewMemMapFs()
 	_ = fs.MkdirAll("/src/docs", 0755)
@@ -363,17 +305,10 @@ func TestVersion_WithMockExec(t *testing.T) {
 // --- list (positive path) ---
 
 func TestList_ValidConfig(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "docs"
-    source: "/home/docs/"
-    target: "/backup/docs/"
-    enabled: true
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("docs", "/home/docs/", "/backup/docs/", testutil.Enabled(true)).
+		Build())
 
 	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
 
@@ -387,17 +322,10 @@ jobs:
 // --- run: logger cleanup happens after cfg.Apply completes ---
 
 func TestRun_LoggerOpenDuringApply(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "docs"
-    source: "/home/docs/"
-    target: "/backup/docs/"
-    enabled: true
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("docs", "/home/docs/", "/backup/docs/", testutil.Enabled(true)).
+		Build())
 
 	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
 	fs := afero.NewMemMapFs()

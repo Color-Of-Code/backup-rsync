@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"backup-rsync/backup/cmd"
+	"backup-rsync/backup/internal/testutil"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,17 +80,10 @@ func TestIntegration_Run_BasicSync(t *testing.T) {
 	writeFile(t, filepath.Join(src, "hello.txt"), "hello world")
 	writeFile(t, filepath.Join(src, "subdir", "nested.txt"), "nested content")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "basic"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-    delete: false
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("basic", src+"/", dst+"/", testutil.Delete(false)).
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
 
@@ -108,16 +102,10 @@ func TestIntegration_Run_IdempotentSync(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "data.txt"), "same content")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "idem"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("idem", src+"/", dst+"/").
+		Build())
 
 	// First sync
 	_, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
@@ -140,17 +128,10 @@ func TestIntegration_Run_DeleteRemovesExtraFiles(t *testing.T) {
 	writeFile(t, filepath.Join(dst, "keep.txt"), "keep me")
 	writeFile(t, filepath.Join(dst, "stale.txt"), "should be removed")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "cleanup"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-    delete: true
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("cleanup", src+"/", dst+"/", testutil.Delete(true)).
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
 
@@ -169,17 +150,10 @@ func TestIntegration_Run_NoDeletePreservesExtraFiles(t *testing.T) {
 	writeFile(t, filepath.Join(src, "a.txt"), "a")
 	writeFile(t, filepath.Join(dst, "extra.txt"), "should remain")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "nodelete"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-    delete: false
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("nodelete", src+"/", dst+"/", testutil.Delete(false)).
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
 
@@ -199,19 +173,10 @@ func TestIntegration_Run_Exclusions(t *testing.T) {
 	writeFile(t, filepath.Join(src, "cache", "tmp.dat"), "temporary data")
 	writeFile(t, filepath.Join(src, "logs", "app.log"), "log data")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "filtered"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-    exclusions:
-      - "cache"
-      - "logs"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("filtered", src+"/", dst+"/", testutil.Exclusions("cache", "logs")).
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
 
@@ -230,17 +195,10 @@ func TestIntegration_Run_DisabledJobSkipped(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "file.txt"), "content")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "disabled-job"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-    enabled: false
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("disabled-job", src+"/", dst+"/", testutil.Enabled(false)).
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
 
@@ -267,19 +225,11 @@ func TestIntegration_Run_MultipleJobs(t *testing.T) {
 	writeFile(t, filepath.Join(srcA, "a.txt"), "alpha")
 	writeFile(t, filepath.Join(srcB, "b.txt"), "bravo")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+base+`"
-targets:
-  - path: "`+base+`"
-jobs:
-  - name: "jobA"
-    source: "`+srcA+`/"
-    target: "`+dstA+`/"
-  - name: "jobB"
-    source: "`+srcB+`/"
-    target: "`+dstB+`/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(base).Target(base).
+		AddJob("jobA", srcA+"/", dstA+"/").
+		AddJob("jobB", srcB+"/", dstB+"/").
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
 
@@ -300,16 +250,10 @@ func TestIntegration_Run_PartialChanges(t *testing.T) {
 	writeFile(t, filepath.Join(src, "unchanged.txt"), "same")
 	writeFile(t, filepath.Join(src, "modified.txt"), "original")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "partial"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("partial", src+"/", dst+"/").
+		Build())
 
 	// Initial sync
 	_, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
@@ -337,16 +281,10 @@ func TestIntegration_Simulate_NoChanges(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "new.txt"), "should not appear in target")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "dryrun"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("dryrun", src+"/", dst+"/").
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "simulate", "--config", cfgPath)
 
@@ -366,16 +304,10 @@ func TestIntegration_Simulate_ShowsChanges(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "report.txt"), "quarterly report")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "preview"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("preview", src+"/", dst+"/").
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "simulate", "--config", cfgPath)
 
@@ -392,16 +324,10 @@ func TestIntegration_SimulateThenRun(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "data.txt"), "important data")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "workflow"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("workflow", src+"/", dst+"/").
+		Build())
 
 	// Simulate first
 	_, err := executeIntegrationCommand(t, "simulate", "--config", cfgPath)
@@ -424,18 +350,10 @@ func TestIntegration_List_ShowsCommands(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "x.txt"), "x")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "listjob"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-    exclusions:
-      - "temp"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("listjob", src+"/", dst+"/", testutil.Exclusions("temp")).
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "list", "--config", cfgPath)
 
@@ -457,19 +375,11 @@ func TestIntegration_Run_VariableSubstitution(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "v.txt"), "vars work")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-variables:
-  src_dir: "`+src+`"
-  dst_dir: "`+dst+`"
-jobs:
-  - name: "var-job"
-    source: "${src_dir}/"
-    target: "${dst_dir}/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		Variable("src_dir", src).Variable("dst_dir", dst).
+		AddJob("var-job", "${src_dir}/", "${dst_dir}/").
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
 
@@ -496,21 +406,11 @@ func TestIntegration_Run_MixedJobsSummary(t *testing.T) {
 	writeFile(t, filepath.Join(srcOK, "ok.txt"), "ok")
 	writeFile(t, filepath.Join(srcSkip, "skip.txt"), "skip")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+base+`"
-targets:
-  - path: "`+base+`"
-jobs:
-  - name: "active"
-    source: "`+srcOK+`/"
-    target: "`+dstOK+`/"
-    enabled: true
-  - name: "inactive"
-    source: "`+srcSkip+`/"
-    target: "`+dstSkip+`/"
-    enabled: false
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(base).Target(base).
+		AddJob("active", srcOK+"/", dstOK+"/", testutil.Enabled(true)).
+		AddJob("inactive", srcSkip+"/", dstSkip+"/", testutil.Enabled(false)).
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
 
@@ -528,16 +428,10 @@ jobs:
 func TestIntegration_Run_EmptySource(t *testing.T) {
 	src, dst := setupDirs(t)
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "empty"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("empty", src+"/", dst+"/").
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
 
@@ -552,16 +446,10 @@ func TestIntegration_Run_DeepHierarchy(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "a", "b", "c", "d", "deep.txt"), "deep file")
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "deep"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("deep", src+"/", dst+"/").
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
 
@@ -580,19 +468,11 @@ func TestIntegration_CheckCoverage_FullCoverage(t *testing.T) {
 
 	dst := t.TempDir()
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "docs"
-    source: "`+filepath.Join(src, "docs")+`/"
-    target: "`+filepath.Join(dst, "docs")+`/"
-  - name: "photos"
-    source: "`+filepath.Join(src, "photos")+`/"
-    target: "`+filepath.Join(dst, "photos")+`/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("docs", filepath.Join(src, "docs")+"/", filepath.Join(dst, "docs")+"/").
+		AddJob("photos", filepath.Join(src, "photos")+"/", filepath.Join(dst, "photos")+"/").
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "check-coverage", "--config", cfgPath)
 
@@ -614,16 +494,10 @@ func TestIntegration_CheckCoverage_IncompleteCoverage(t *testing.T) {
 
 	dst := t.TempDir()
 
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "docs-only"
-    source: "`+filepath.Join(src, "docs")+`/"
-    target: "`+filepath.Join(dst, "docs")+`/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source(src).Target(dst).
+		AddJob("docs-only", filepath.Join(src, "docs")+"/", filepath.Join(dst, "docs")+"/").
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "check-coverage", "--config", cfgPath)
 
@@ -635,18 +509,11 @@ jobs:
 // --- config show: end-to-end with variable resolution ---
 
 func TestIntegration_ConfigShow(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/data"
-targets:
-  - path: "/backup"
-variables:
-  base: "/backup"
-jobs:
-  - name: "resolved"
-    source: "/data/files/"
-    target: "${base}/files/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/data").Target("/backup").
+		Variable("base", "/backup").
+		AddJob("resolved", "/data/files/", "${base}/files/").
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "config", "show", "--config", cfgPath)
 
@@ -658,16 +525,10 @@ jobs:
 // --- config validate: valid config passes ---
 
 func TestIntegration_ConfigValidate_Valid(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/data"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "valid"
-    source: "/data/stuff/"
-    target: "/backup/stuff/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/data").Target("/backup").
+		AddJob("valid", "/data/stuff/", "/backup/stuff/").
+		Build())
 
 	stdout, err := executeIntegrationCommand(t, "config", "validate", "--config", cfgPath)
 
@@ -678,19 +539,11 @@ jobs:
 // --- config validate: overlapping sources are rejected ---
 
 func TestIntegration_ConfigValidate_OverlappingSources(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, `
-sources:
-  - path: "/data"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "parent"
-    source: "/data/user/"
-    target: "/backup/user/"
-  - name: "child"
-    source: "/data/user/docs/"
-    target: "/backup/docs/"
-`)
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/data").Target("/backup").
+		AddJob("parent", "/data/user/", "/backup/user/").
+		AddJob("child", "/data/user/docs/", "/backup/docs/").
+		Build())
 
 	_, err := executeIntegrationCommand(t, "config", "validate", "--config", cfgPath)
 

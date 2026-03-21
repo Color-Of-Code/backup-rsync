@@ -379,20 +379,11 @@ func TestLoadResolvedConfig_InvalidYAML(t *testing.T) {
 }
 
 func TestLoadResolvedConfig_DuplicateJobNames(t *testing.T) {
-	yaml := `
-sources:
-  - path: "/src"
-targets:
-  - path: "/tgt"
-jobs:
-  - name: "dup"
-    source: "/src/a"
-    target: "/tgt/a"
-  - name: "dup"
-    source: "/src/b"
-    target: "/tgt/b"
-`
-	path := testutil.WriteConfigFile(t, yaml)
+	path := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/src").Target("/tgt").
+		AddJob("dup", "/src/a", "/tgt/a").
+		AddJob("dup", "/src/b", "/tgt/b").
+		Build())
 
 	_, err := LoadResolvedConfig(path)
 	require.Error(t, err)
@@ -401,17 +392,10 @@ jobs:
 }
 
 func TestLoadResolvedConfig_InvalidSourcePath(t *testing.T) {
-	yaml := `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "job1"
-    source: "/invalid/source"
-    target: "/backup/stuff"
-`
-	path := testutil.WriteConfigFile(t, yaml)
+	path := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("job1", "/invalid/source", "/backup/stuff").
+		Build())
 
 	_, err := LoadResolvedConfig(path)
 	require.Error(t, err)
@@ -419,20 +403,11 @@ jobs:
 }
 
 func TestLoadResolvedConfig_OverlappingSourcePaths(t *testing.T) {
-	yaml := `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "parent"
-    source: "/home/user"
-    target: "/backup/user"
-  - name: "child"
-    source: "/home/user/docs"
-    target: "/backup/docs"
-`
-	path := testutil.WriteConfigFile(t, yaml)
+	path := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("parent", "/home/user", "/backup/user").
+		AddJob("child", "/home/user/docs", "/backup/docs").
+		Build())
 
 	_, err := LoadResolvedConfig(path)
 	require.Error(t, err)
@@ -440,22 +415,11 @@ jobs:
 }
 
 func TestLoadResolvedConfig_OverlappingSourcePathsAllowedByExclusion(t *testing.T) {
-	yaml := `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "parent"
-    source: "/home/user"
-    target: "/backup/user"
-    exclusions:
-      - "docs"
-  - name: "child"
-    source: "/home/user/docs"
-    target: "/backup/docs"
-`
-	path := testutil.WriteConfigFile(t, yaml)
+	path := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("parent", "/home/user", "/backup/user", testutil.Exclusions("docs")).
+		AddJob("child", "/home/user/docs", "/backup/docs").
+		Build())
 
 	cfg, err := LoadResolvedConfig(path)
 	require.NoError(t, err)
@@ -463,20 +427,11 @@ jobs:
 }
 
 func TestLoadResolvedConfig_OverlappingTargetPaths(t *testing.T) {
-	yaml := `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-jobs:
-  - name: "job1"
-    source: "/home/docs"
-    target: "/backup/all"
-  - name: "job2"
-    source: "/home/photos"
-    target: "/backup/all/photos"
-`
-	path := testutil.WriteConfigFile(t, yaml)
+	path := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		AddJob("job1", "/home/docs", "/backup/all").
+		AddJob("job2", "/home/photos", "/backup/all/photos").
+		Build())
 
 	_, err := LoadResolvedConfig(path)
 	require.Error(t, err)
@@ -484,19 +439,11 @@ jobs:
 }
 
 func TestLoadResolvedConfig_ValidConfig(t *testing.T) {
-	yaml := `
-sources:
-  - path: "/home"
-targets:
-  - path: "/backup"
-variables:
-  base: "/backup"
-jobs:
-  - name: "docs"
-    source: "/home/docs"
-    target: "${base}/docs"
-`
-	path := testutil.WriteConfigFile(t, yaml)
+	path := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home").Target("/backup").
+		Variable("base", "/backup").
+		AddJob("docs", "/home/docs", "${base}/docs").
+		Build())
 
 	cfg, err := LoadResolvedConfig(path)
 	require.NoError(t, err)
