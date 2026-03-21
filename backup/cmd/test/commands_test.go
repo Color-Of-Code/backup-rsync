@@ -3,12 +3,12 @@ package cmd_test
 import (
 	"bytes"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"backup-rsync/backup/cmd"
 	"backup-rsync/backup/internal"
+	"backup-rsync/backup/internal/testutil"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -22,18 +22,6 @@ type stubExec struct {
 
 func (s *stubExec) Execute(_ string, _ ...string) ([]byte, error) {
 	return s.output, s.err
-}
-
-func writeConfigFile(t *testing.T, content string) string {
-	t.Helper()
-
-	dir := t.TempDir()
-	path := filepath.Join(dir, "test.yaml")
-
-	err := os.WriteFile(path, []byte(content), 0600)
-	require.NoError(t, err)
-
-	return path
 }
 
 func executeCommand(t *testing.T, args ...string) (string, error) {
@@ -77,7 +65,7 @@ func executeCommandWithDeps(t *testing.T, fs afero.Fs, shell internal.Exec, args
 // --- config show ---
 
 func TestConfigShow_ValidConfig(t *testing.T) {
-	cfgPath := writeConfigFile(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/home"
 targets:
@@ -104,7 +92,7 @@ func TestConfigShow_MissingFile(t *testing.T) {
 }
 
 func TestConfigShow_InvalidYAML(t *testing.T) {
-	cfgPath := writeConfigFile(t, `{{{invalid yaml`)
+	cfgPath := testutil.WriteConfigFile(t, `{{{invalid yaml`)
 
 	_, err := executeCommand(t, "config", "show", "--config", cfgPath)
 
@@ -115,7 +103,7 @@ func TestConfigShow_InvalidYAML(t *testing.T) {
 // --- config validate ---
 
 func TestConfigValidate_ValidConfig(t *testing.T) {
-	cfgPath := writeConfigFile(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/home"
 targets:
@@ -140,7 +128,7 @@ func TestConfigValidate_MissingFile(t *testing.T) {
 }
 
 func TestConfigValidate_DuplicateJobNames(t *testing.T) {
-	cfgPath := writeConfigFile(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/home"
 targets:
@@ -179,7 +167,7 @@ func TestRun_MissingConfig(t *testing.T) {
 }
 
 func TestRun_CreateLoggerError(t *testing.T) {
-	cfgPath := writeConfigFile(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/home"
 targets:
@@ -202,7 +190,7 @@ jobs:
 }
 
 func TestRun_ValidConfig(t *testing.T) {
-	cfgPath := writeConfigFile(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/home"
 targets:
@@ -233,7 +221,7 @@ func TestSimulate_MissingConfig(t *testing.T) {
 }
 
 func TestSimulate_CreateLoggerError(t *testing.T) {
-	cfgPath := writeConfigFile(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/home"
 targets:
@@ -256,7 +244,7 @@ jobs:
 }
 
 func TestSimulate_ValidConfig(t *testing.T) {
-	cfgPath := writeConfigFile(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/home"
 targets:
@@ -303,7 +291,7 @@ func TestCheckCoverage_MissingConfig(t *testing.T) {
 }
 
 func TestCheckCoverage_WithUncoveredPaths(t *testing.T) {
-	cfgPath := writeConfigFile(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/src"
 targets:
@@ -326,7 +314,7 @@ jobs:
 }
 
 func TestCheckCoverage_ValidConfig(t *testing.T) {
-	cfgPath := writeConfigFile(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/src"
 targets:
@@ -375,7 +363,7 @@ func TestVersion_WithMockExec(t *testing.T) {
 // --- list (positive path) ---
 
 func TestList_ValidConfig(t *testing.T) {
-	cfgPath := writeConfigFile(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/home"
 targets:
@@ -399,7 +387,7 @@ jobs:
 // --- run: logger cleanup happens after cfg.Apply completes ---
 
 func TestRun_LoggerOpenDuringApply(t *testing.T) {
-	cfgPath := writeConfigFile(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/home"
 targets:

@@ -55,17 +55,6 @@ func readFileContent(t *testing.T, path string) string {
 	return string(data)
 }
 
-func writeIntegrationConfig(t *testing.T, yaml string) string {
-	t.Helper()
-
-	dir := t.TempDir()
-	path := filepath.Join(dir, "test.yaml")
-
-	require.NoError(t, os.WriteFile(path, []byte(yaml), 0600))
-
-	return path
-}
-
 func executeIntegrationCommand(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
@@ -90,7 +79,7 @@ func TestIntegration_Run_BasicSync(t *testing.T) {
 	writeFile(t, filepath.Join(src, "hello.txt"), "hello world")
 	writeFile(t, filepath.Join(src, "subdir", "nested.txt"), "nested content")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -119,7 +108,7 @@ func TestIntegration_Run_IdempotentSync(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "data.txt"), "same content")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -151,7 +140,7 @@ func TestIntegration_Run_DeleteRemovesExtraFiles(t *testing.T) {
 	writeFile(t, filepath.Join(dst, "keep.txt"), "keep me")
 	writeFile(t, filepath.Join(dst, "stale.txt"), "should be removed")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -180,7 +169,7 @@ func TestIntegration_Run_NoDeletePreservesExtraFiles(t *testing.T) {
 	writeFile(t, filepath.Join(src, "a.txt"), "a")
 	writeFile(t, filepath.Join(dst, "extra.txt"), "should remain")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -210,7 +199,7 @@ func TestIntegration_Run_Exclusions(t *testing.T) {
 	writeFile(t, filepath.Join(src, "cache", "tmp.dat"), "temporary data")
 	writeFile(t, filepath.Join(src, "logs", "app.log"), "log data")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -241,7 +230,7 @@ func TestIntegration_Run_DisabledJobSkipped(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "file.txt"), "content")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -278,7 +267,7 @@ func TestIntegration_Run_MultipleJobs(t *testing.T) {
 	writeFile(t, filepath.Join(srcA, "a.txt"), "alpha")
 	writeFile(t, filepath.Join(srcB, "b.txt"), "bravo")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+base+`"
 targets:
@@ -311,7 +300,7 @@ func TestIntegration_Run_PartialChanges(t *testing.T) {
 	writeFile(t, filepath.Join(src, "unchanged.txt"), "same")
 	writeFile(t, filepath.Join(src, "modified.txt"), "original")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -348,7 +337,7 @@ func TestIntegration_Simulate_NoChanges(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "new.txt"), "should not appear in target")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -377,7 +366,7 @@ func TestIntegration_Simulate_ShowsChanges(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "report.txt"), "quarterly report")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -403,7 +392,7 @@ func TestIntegration_SimulateThenRun(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "data.txt"), "important data")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -435,7 +424,7 @@ func TestIntegration_List_ShowsCommands(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "x.txt"), "x")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -468,7 +457,7 @@ func TestIntegration_Run_VariableSubstitution(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "v.txt"), "vars work")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -507,7 +496,7 @@ func TestIntegration_Run_MixedJobsSummary(t *testing.T) {
 	writeFile(t, filepath.Join(srcOK, "ok.txt"), "ok")
 	writeFile(t, filepath.Join(srcSkip, "skip.txt"), "skip")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+base+`"
 targets:
@@ -539,7 +528,7 @@ jobs:
 func TestIntegration_Run_EmptySource(t *testing.T) {
 	src, dst := setupDirs(t)
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -563,7 +552,7 @@ func TestIntegration_Run_DeepHierarchy(t *testing.T) {
 
 	writeFile(t, filepath.Join(src, "a", "b", "c", "d", "deep.txt"), "deep file")
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -591,7 +580,7 @@ func TestIntegration_CheckCoverage_FullCoverage(t *testing.T) {
 
 	dst := t.TempDir()
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -625,7 +614,7 @@ func TestIntegration_CheckCoverage_IncompleteCoverage(t *testing.T) {
 
 	dst := t.TempDir()
 
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "`+src+`"
 targets:
@@ -646,7 +635,7 @@ jobs:
 // --- config show: end-to-end with variable resolution ---
 
 func TestIntegration_ConfigShow(t *testing.T) {
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/data"
 targets:
@@ -669,7 +658,7 @@ jobs:
 // --- config validate: valid config passes ---
 
 func TestIntegration_ConfigValidate_Valid(t *testing.T) {
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/data"
 targets:
@@ -689,7 +678,7 @@ jobs:
 // --- config validate: overlapping sources are rejected ---
 
 func TestIntegration_ConfigValidate_OverlappingSources(t *testing.T) {
-	cfgPath := writeIntegrationConfig(t, `
+	cfgPath := testutil.WriteConfigFile(t, `
 sources:
   - path: "/data"
 targets:

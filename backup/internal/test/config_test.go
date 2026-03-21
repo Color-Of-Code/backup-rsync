@@ -3,8 +3,6 @@ package internal_test
 import (
 	"bytes"
 	"log"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	. "backup-rsync/backup/internal"
+	"backup-rsync/backup/internal/testutil"
 )
 
 func TestLoadConfig1(t *testing.T) {
@@ -365,18 +364,6 @@ func TestResolveConfig(t *testing.T) {
 	assert.Equal(t, "/backup/user/Pictures", resolvedCfg.Jobs[1].Target)
 }
 
-// writeTestConfig writes YAML content to a temp file and returns its path.
-func writeTestConfig(t *testing.T, content string) string {
-	t.Helper()
-
-	dir := t.TempDir()
-	path := filepath.Join(dir, "test.yaml")
-	err := os.WriteFile(path, []byte(content), 0600)
-	require.NoError(t, err)
-
-	return path
-}
-
 func TestLoadResolvedConfig_FileNotFound(t *testing.T) {
 	_, err := LoadResolvedConfig("/nonexistent/path/config.yaml")
 	require.Error(t, err)
@@ -384,7 +371,7 @@ func TestLoadResolvedConfig_FileNotFound(t *testing.T) {
 }
 
 func TestLoadResolvedConfig_InvalidYAML(t *testing.T) {
-	path := writeTestConfig(t, "{{invalid yaml")
+	path := testutil.WriteConfigFile(t, "{{invalid yaml")
 
 	_, err := LoadResolvedConfig(path)
 	require.Error(t, err)
@@ -405,7 +392,7 @@ jobs:
     source: "/src/b"
     target: "/tgt/b"
 `
-	path := writeTestConfig(t, yaml)
+	path := testutil.WriteConfigFile(t, yaml)
 
 	_, err := LoadResolvedConfig(path)
 	require.Error(t, err)
@@ -424,7 +411,7 @@ jobs:
     source: "/invalid/source"
     target: "/backup/stuff"
 `
-	path := writeTestConfig(t, yaml)
+	path := testutil.WriteConfigFile(t, yaml)
 
 	_, err := LoadResolvedConfig(path)
 	require.Error(t, err)
@@ -445,7 +432,7 @@ jobs:
     source: "/home/user/docs"
     target: "/backup/docs"
 `
-	path := writeTestConfig(t, yaml)
+	path := testutil.WriteConfigFile(t, yaml)
 
 	_, err := LoadResolvedConfig(path)
 	require.Error(t, err)
@@ -468,7 +455,7 @@ jobs:
     source: "/home/user/docs"
     target: "/backup/docs"
 `
-	path := writeTestConfig(t, yaml)
+	path := testutil.WriteConfigFile(t, yaml)
 
 	cfg, err := LoadResolvedConfig(path)
 	require.NoError(t, err)
@@ -489,7 +476,7 @@ jobs:
     source: "/home/photos"
     target: "/backup/all/photos"
 `
-	path := writeTestConfig(t, yaml)
+	path := testutil.WriteConfigFile(t, yaml)
 
 	_, err := LoadResolvedConfig(path)
 	require.Error(t, err)
@@ -509,7 +496,7 @@ jobs:
     source: "/home/docs"
     target: "${base}/docs"
 `
-	path := writeTestConfig(t, yaml)
+	path := testutil.WriteConfigFile(t, yaml)
 
 	cfg, err := LoadResolvedConfig(path)
 	require.NoError(t, err)
