@@ -2,37 +2,19 @@ package cmd
 
 import (
 	"backup-rsync/backup/internal"
-	"fmt"
-	"time"
+	"io"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
 func buildRunCommand(fs afero.Fs, shell internal.Exec) *cobra.Command {
-	return &cobra.Command{
-		Use:   "run",
-		Short: "Execute the sync jobs",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			configPath, _ := cmd.Flags().GetString("config")
-			rsyncPath, _ := cmd.Flags().GetString("rsync-path")
-
-			cfg, err := internal.LoadResolvedConfig(configPath)
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			logger, logPath, cleanup, err := internal.CreateMainLogger(fs, configPath, false, time.Now())
-			if err != nil {
-				return fmt.Errorf("creating logger: %w", err)
-			}
-
-			defer cleanup()
-
-			out := cmd.OutOrStdout()
-			command := internal.NewSyncCommand(rsyncPath, logPath, shell, out)
-
-			return cfg.Apply(command, logger, out)
+	return buildJobCommand(fs, jobCommandOptions{
+		use:      "run",
+		short:    "Execute the sync jobs",
+		needsLog: true,
+		factory: func(rsyncPath string, logPath string, out io.Writer) internal.JobCommand {
+			return internal.NewSyncCommand(rsyncPath, logPath, shell, out)
 		},
-	}
+	})
 }

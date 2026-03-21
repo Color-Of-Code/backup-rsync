@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"backup-rsync/backup/cmd"
@@ -393,4 +394,57 @@ jobs:
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "Job: docs")
 	assert.Contains(t, stdout, "Status [docs]: SUCCESS")
+}
+
+// --- run: logger cleanup happens after cfg.Apply completes ---
+
+func TestRun_LoggerOpenDuringApply(t *testing.T) {
+	cfgPath := writeConfigFile(t, `
+sources:
+  - path: "/home"
+targets:
+  - path: "/backup"
+jobs:
+  - name: "docs"
+    source: "/home/docs/"
+    target: "/backup/docs/"
+    enabled: true
+`)
+
+	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
+	fs := afero.NewMemMapFs()
+
+	stdout, err := executeCommandWithDeps(t, fs, shell, "run", "--config", cfgPath)
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Status [docs]: SUCCESS")
+
+	// Walk the in-memory filesystem to find the summary log written by the logger.
+	// cfg.Apply writes "STATUS [docs]: SUCCESS" via the logger after the if-block
+	// where defer cleanup() is registered. If cleanup ran too early (closing the
+	// log file before Apply), the log file would be empty or missing this entry.
+	var summaryContent string
+
+	_ = afero.Walk(fs, "logs", func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		if strings.HasSuffix(path, "summary.log") {
+			data, readErr := afero.ReadFile(fs, path)
+			require.NoError(t, readErr)
+
+			summaryContent = string(data)
+		}
+
+		return nil
+	})
+
+	require.NotEmpty(t, summaryContent, "summary.log should have been created")
+	assert.Contains(t, summaryContent, "STATUS [docs]: SUCCESS",
+		"logger must remain open during cfg.Apply — proves defer cleanup() is function-scoped")
 }

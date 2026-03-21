@@ -2,32 +2,17 @@ package cmd
 
 import (
 	"backup-rsync/backup/internal"
-	"fmt"
 	"io"
-	"log"
 
 	"github.com/spf13/cobra"
 )
 
 func buildListCommand(shell internal.Exec) *cobra.Command {
-	return &cobra.Command{
-		Use:   "list",
-		Short: "List the commands that will be executed",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			configPath, _ := cmd.Flags().GetString("config")
-			rsyncPath, _ := cmd.Flags().GetString("rsync-path")
-
-			cfg, err := internal.LoadResolvedConfig(configPath)
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			out := cmd.OutOrStdout()
-			command := internal.NewListCommand(rsyncPath, shell, out)
-
-			logger := log.New(io.Discard, "", 0)
-
-			return cfg.Apply(command, logger, out)
+	return buildJobCommand(nil, jobCommandOptions{
+		use:   "list",
+		short: "List the commands that will be executed",
+		factory: func(rsyncPath string, _ string, out io.Writer) internal.JobCommand {
+			return internal.NewListCommand(rsyncPath, shell, out)
 		},
-	}
+	})
 }
