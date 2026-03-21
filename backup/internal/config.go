@@ -134,22 +134,16 @@ func ValidatePath(jobPath string, paths []Path, pathType string, jobName string)
 }
 
 func ValidatePaths(cfg Config) error {
-	invalidPaths := []string{}
+	errs := make([]error, 0, len(cfg.Jobs)*2) //nolint:mnd // 2 validations per job: source + target
 
 	for _, job := range cfg.Jobs {
-		err := ValidatePath(job.Source, cfg.Sources, "source", job.Name)
-		if err != nil {
-			invalidPaths = append(invalidPaths, err.Error())
-		}
-
-		err = ValidatePath(job.Target, cfg.Targets, "target", job.Name)
-		if err != nil {
-			invalidPaths = append(invalidPaths, err.Error())
-		}
+		errs = append(errs, ValidatePath(job.Source, cfg.Sources, "source", job.Name))
+		errs = append(errs, ValidatePath(job.Target, cfg.Targets, "target", job.Name))
 	}
 
-	if len(invalidPaths) > 0 {
-		return fmt.Errorf("%w: %v", ErrPathValidation, invalidPaths)
+	joined := errors.Join(errs...)
+	if joined != nil {
+		return fmt.Errorf("%w: %w", ErrPathValidation, joined)
 	}
 
 	return nil
