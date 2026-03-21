@@ -36,6 +36,14 @@ func (job Job) Apply(rsync JobCommand) JobStatus {
 	return rsync.Run(job)
 }
 
+func boolDefault(ptr *bool, defaultVal bool) bool {
+	if ptr != nil {
+		return *ptr
+	}
+
+	return defaultVal
+}
+
 // UnmarshalYAML implements custom YAML unmarshaling to handle defaults properly.
 func (job *Job) UnmarshalYAML(node *yaml.Node) error {
 	var jobYAML JobYAML
@@ -45,24 +53,12 @@ func (job *Job) UnmarshalYAML(node *yaml.Node) error {
 		return fmt.Errorf("failed to decode YAML node: %w", err)
 	}
 
-	// Copy basic fields
 	job.Name = jobYAML.Name
 	job.Source = jobYAML.Source
 	job.Target = jobYAML.Target
 	job.Exclusions = jobYAML.Exclusions
-
-	// Handle boolean fields with defaults
-	if jobYAML.Delete != nil {
-		job.Delete = *jobYAML.Delete
-	} else {
-		job.Delete = true // default value
-	}
-
-	if jobYAML.Enabled != nil {
-		job.Enabled = *jobYAML.Enabled
-	} else {
-		job.Enabled = true // default value
-	}
+	job.Delete = boolDefault(jobYAML.Delete, true)
+	job.Enabled = boolDefault(jobYAML.Enabled, true)
 
 	return nil
 }

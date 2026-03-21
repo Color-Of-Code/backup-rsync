@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/spf13/afero"
@@ -40,20 +40,17 @@ func (c *CoverageChecker) ListUncoveredPaths(cfg Config) []string {
 		c.checkPath(source.Path, cfg, &result, seen)
 	}
 
-	sort.Strings(result) // Ensure consistent ordering for test comparison
+	slices.Sort(result) // Ensure consistent ordering for test comparison
 
 	return result
 }
 
 func (c *CoverageChecker) isExcluded(path string, job Job) bool {
-	for _, exclusion := range job.Exclusions {
-		exclusionPath := filepath.Join(job.Source, exclusion)
-		if strings.HasPrefix(NormalizePath(path), exclusionPath) {
-			return true
-		}
-	}
+	normalized := NormalizePath(path)
 
-	return false
+	return slices.ContainsFunc(job.Exclusions, func(exclusion string) bool {
+		return strings.HasPrefix(normalized, filepath.Join(job.Source, exclusion))
+	})
 }
 
 func (c *CoverageChecker) isCoveredByJob(path string, job Job) bool {
@@ -73,13 +70,9 @@ func (c *CoverageChecker) isCoveredByJob(path string, job Job) bool {
 }
 
 func (c *CoverageChecker) isCovered(path string, jobs []Job) bool {
-	for _, job := range jobs {
-		if c.isCoveredByJob(path, job) {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(jobs, func(job Job) bool {
+		return c.isCoveredByJob(path, job)
+	})
 }
 
 func (c *CoverageChecker) checkPath(path string, cfg Config, result *[]string, seen map[string]bool) {

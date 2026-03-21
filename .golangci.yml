@@ -23,6 +23,7 @@ linters:
             - os
             - path/filepath
             - sort
+            - slices
             - strings
             - testing
             - time

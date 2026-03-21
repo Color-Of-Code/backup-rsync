@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -47,29 +48,22 @@ func (cfg Config) Apply(rsync JobCommand, logger *log.Logger, output io.Writer) 
 		logger.Printf("Rsync Version Info: %s", versionInfo)
 	}
 
-	var succeeded, failed, skipped int
+	counts := make(map[JobStatus]int)
 
 	for _, job := range cfg.Jobs {
 		status := job.Apply(rsync)
 		logger.Printf("STATUS [%s]: %s", job.Name, status)
 		fmt.Fprintf(output, "Status [%s]: %s\n", job.Name, status)
-
-		switch status {
-		case Success:
-			succeeded++
-		case Failure:
-			failed++
-		case Skipped:
-			skipped++
-		}
+		counts[status]++
 	}
 
-	summary := fmt.Sprintf("Summary: %d succeeded, %d failed, %d skipped", succeeded, failed, skipped)
+	summary := fmt.Sprintf("Summary: %d succeeded, %d failed, %d skipped",
+		counts[Success], counts[Failure], counts[Skipped])
 	logger.Print(summary)
 	fmt.Fprintln(output, summary)
 
-	if failed > 0 {
-		return fmt.Errorf("%w: %d of %d jobs", ErrJobFailure, failed, len(cfg.Jobs))
+	if counts[Failure] > 0 {
+		return fmt.Errorf("%w: %d of %d jobs", ErrJobFailure, counts[Failure], len(cfg.Jobs))
 	}
 
 	return nil
@@ -89,12 +83,12 @@ func LoadConfig(reader io.Reader) (Config, error) {
 }
 
 func SubstituteVariables(input string, variables map[string]string) string {
+	oldnew := make([]string, 0, len(variables)*2) //nolint:mnd // 2 entries per variable: key placeholder + value
 	for key, value := range variables {
-		placeholder := fmt.Sprintf("${%s}", key)
-		input = strings.ReplaceAll(input, placeholder, value)
+		oldnew = append(oldnew, "${"+key+"}", value)
 	}
 
-	return input
+	return strings.NewReplacer(oldnew...).Replace(input)
 }
 
 func ResolveConfig(cfg Config) Config {
@@ -108,7 +102,8 @@ func ResolveConfig(cfg Config) Config {
 }
 
 func ValidateJobNames(jobs []Job) error {
-	invalidNames := []string{}
+	var invalidNames []string
+
 	nameSet := make(map[string]bool)
 
 	for _, job := range jobs {
@@ -118,12 +113,8 @@ func ValidateJobNames(jobs []Job) error {
 			nameSet[job.Name] = true
 		}
 
-		for _, r := range job.Name {
-			if r > 127 || r == ' ' {
-				invalidNames = append(invalidNames, "invalid characters in job name: "+job.Name)
-
-				break
-			}
+		if strings.ContainsFunc(job.Name, func(r rune) bool { return r > 127 || r == ' ' }) {
+			invalidNames = append(invalidNames, "invalid characters in job name: "+job.Name)
 		}
 	}
 
@@ -135,10 +126,8 @@ func ValidateJobNames(jobs []Job) error {
 }
 
 func ValidatePath(jobPath string, paths []Path, pathType string, jobName string) error {
-	for _, path := range paths {
-		if strings.HasPrefix(jobPath, path.Path) {
-			return nil
-		}
+	if slices.ContainsFunc(paths, func(p Path) bool { return strings.HasPrefix(jobPath, p.Path) }) {
+		return nil
 	}
 
 	return fmt.Errorf("%w for job '%s': %s %s", ErrInvalidPath, jobName, pathType, jobPath)
@@ -172,19 +161,9 @@ func validateJobPaths(jobs []Job, pathType string, getPath func(job Job) string)
 			if i != j {
 				path1, path2 := NormalizePath(getPath(job1)), NormalizePath(getPath(job2))
 
-				// Check if path2 is part of job1's exclusions
-				excluded := false
-
-				if pathType == "source" {
-					for _, exclusion := range job2.Exclusions {
-						exclusionPath := NormalizePath(filepath.Join(job2.Source, exclusion))
-						if strings.HasPrefix(path1, exclusionPath) {
-							excluded = true
-
-							break
-						}
-					}
-				}
+				excluded := pathType == "source" && slices.ContainsFunc(job2.Exclusions, func(exclusion string) bool {
+					return strings.HasPrefix(path1, NormalizePath(filepath.Join(job2.Source, exclusion)))
+				})
 
 				if !excluded && strings.HasPrefix(path1, path2) {
 					return fmt.Errorf("%w: job '%s' has a %s path overlapping with job '%s'",
