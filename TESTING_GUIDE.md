@@ -1,227 +1,91 @@
 # Testing Guide
 
-## Overview
+## Approach
 
-All tests use dependency injection — no global state mutation. Key patterns:
-
-- **`testify`** for assertions (`require` for fatal checks, `assert` for non-fatal)
-- **`mockery`** for generated mocks (`MockExec`, `MockJobCommand`)
-- **`afero`** for in-memory filesystem abstraction
-- **`bytes.Buffer`** for capturing output
-- **Table-driven tests** for multiple input scenarios
+- **Dependency injection** over global state — every external dependency is injected via an interface or value
+- **`testify`** for assertions — `require` (fatal) and `assert` (non-fatal)
+- **`mockery`** for generated interface mocks
+- **`afero`** for in-memory filesystem abstraction in unit tests
+- **Table-driven tests** — canonical Go pattern; use whenever 2+ cases share the same structure
+- **Declarative test data builders** in a shared `testutil` package — avoid inline YAML and repeated struct literals
 - Test files live in `<package>/test/` subdirectories
 
-## Test Architecture
+## Dependency Injection
 
-```
-backup/
-  cmd/test/
-    commands_test.go      # CLI command tests (all commands, stubbed exec)
-    integration_test.go   # Integration tests with real rsync (build tag: integration)
-    root_test.go          # Root command help output
-  internal/test/
-    check_test.go      # CoverageChecker tests (afero-based)
-    config_test.go     # Config loading, validation, Apply
-    helper_test.go     # NormalizePath, CreateMainLogger
-    job_test.go        # Job.Apply with MockJobCommand
-    rsync_test.go      # Command constructors, Run methods, GetVersionInfo
-    mock_exec_test.go          # Generated mock for Exec interface
-    mock_jobcommand_test.go    # Generated mock for JobCommand interface
-```
+All external dependencies are abstracted behind interfaces or injected types. In tests, swap real implementations for mocks, stubs, or in-memory alternatives:
 
-## Dependency Injection Points
+| What              | Abstraction      | In Tests                                       |
+| ----------------- | ---------------- | ---------------------------------------------- |
+| Command execution | Interface        | Generated mock or lightweight stub             |
+| Job runner        | Interface        | Generated mock                                 |
+| Filesystem        | `afero.Fs`       | `afero.NewMemMapFs()`                          |
+| Output            | `io.Writer`      | `bytes.Buffer` or `io.Discard`                 |
+| Logging           | `*log.Logger`    | Logger writing to a `bytes.Buffer`             |
+| Time              | `time.Time`      | Fixed value via `time.Date(...)`               |
 
-| Dependency        | Interface/Type        | Real                                            | Test                     |
-| ----------------- | --------------------- | ----------------------------------------------- | ------------------------ |
-| Command execution | `internal.Exec`       | `OsExec`                                        | `MockExec` or `stubExec` |
-| Job runner        | `internal.JobCommand` | `ListCommand`, `SyncCommand`, `SimulateCommand` | `MockJobCommand`         |
-| Filesystem        | `afero.Fs`            | `afero.NewOsFs()`                               | `afero.NewMemMapFs()`    |
-| Output            | `io.Writer`           | `os.Stdout` / `cmd.OutOrStdout()`               | `bytes.Buffer`           |
-| Logging           | `*log.Logger`         | File-backed logger                              | `log.New(&buf, "", 0)`   |
-| Time              | `time.Time`           | `time.Now()`                                    | Fixed `time.Date(...)`   |
+See `internal/exec.go` and `internal/job_command.go` for the interface definitions. See `cmd/root.go` for the builder functions that wire dependencies.
 
-## Command-Level Tests (cmd/test/)
+## Test Data Builders
 
-Commands are tested through cobra's `Execute()` with captured stdout:
+A shared `internal/testutil/` package provides declarative helpers to reduce boilerplate:
 
-```go
-// Stub for Exec interface — lightweight alternative to MockExec for cmd tests
-type stubExec struct {
-    output []byte
-    err    error
-}
+- **Config builder** — fluent API to generate YAML config strings without raw string literals
+- **Config file writer** — writes content to a temp file and returns the path
+- **Job builder** — creates a `Job` struct with sensible defaults; override individual fields via functional options
 
-func (s *stubExec) Execute(_ string, _ ...string) ([]byte, error) {
-    return s.output, s.err
-}
+See `internal/testutil/*.go` for the full API and available options.
 
-// Helper: run a command with full dependency injection
-func executeCommandWithDeps(t *testing.T, fs afero.Fs, shell internal.Exec, args ...string) (string, error) {
-    t.Helper()
-    rootCmd := cmd.BuildRootCommandWithDeps(fs, shell)
-    var stdout bytes.Buffer
-    rootCmd.SetOut(&stdout)
-    rootCmd.SetErr(&bytes.Buffer{})
-    rootCmd.SetArgs(args)
-    err := rootCmd.Execute()
-    return stdout.String(), err
-}
-```
+## Table-Driven Tests
 
-Usage:
+Use table-driven tests whenever multiple cases share the same test structure and differ only in inputs and expectations. Define a slice of test structs, iterate with `t.Run()`.
 
-```go
-func TestRun_ValidConfig(t *testing.T) {
-    cfgPath := writeConfigFile(t, `...yaml...`)
-    shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
+**When NOT to use**: when cases need fundamentally different mock wiring, different assertion logic, or complex per-case setup. If you'd need a `func(...)` closure field in the table struct, keep tests separate.
 
-    stdout, err := executeCommandWithDeps(t, afero.NewMemMapFs(), shell, "run", "--config", cfgPath)
+Browse the test files for examples — most validation, path-checking, and argument-building tests follow this pattern.
 
-    require.NoError(t, err)
-    assert.Contains(t, stdout, "Job: docs")
-    assert.Contains(t, stdout, "Status [docs]: SUCCESS")
-}
-```
+## Command-Level Tests
 
-Three builder levels available:
+CLI commands are tested through cobra's `Execute()` with captured stdout/stderr. Helper functions in the test files wrap the root command builder at different injection levels (default deps, custom filesystem, or full control).
 
-- `BuildRootCommand()` — production defaults (real OS filesystem, real exec)
-- `BuildRootCommandWithFs(fs)` — custom filesystem, real exec
-- `BuildRootCommandWithDeps(fs, shell)` — full control for testing
+A lightweight exec stub (implementing the `Exec` interface inline) is used instead of full mocks for command-level tests where only the output matters.
 
-## Internal Tests — Mockery Mocks
+## Generated Mocks
 
-Generated mocks use the expectation pattern:
+Generated mocks (via `mockery`) use the `.EXPECT()` pattern for setting expectations. Each test creates its own mock instance — no shared state between tests.
 
-```go
-func TestConfigApply_VersionInfoSuccess(t *testing.T) {
-    mockCmd := NewMockJobCommand(t)
-    var output bytes.Buffer
-    logger := log.New(&bytes.Buffer{}, "", 0)
-
-    cfg := Config{
-        Jobs: []Job{
-            {Name: "job1", Source: "/src/", Target: "/dst/", Enabled: true},
-        },
-    }
-
-    mockCmd.EXPECT().GetVersionInfo().Return("rsync version 3.2.3", "/usr/bin/rsync", nil).Once()
-    mockCmd.EXPECT().Run(mock.AnythingOfType("internal.Job")).Return(Success).Once()
-
-    err := cfg.Apply(mockCmd, logger, &output)
-    require.NoError(t, err)
-}
-```
-
-## CoverageChecker Tests (afero)
-
-The `CoverageChecker` uses `afero.Fs` so tests never hit the real filesystem:
-
-```go
-func newTestChecker() (*CoverageChecker, *bytes.Buffer) {
-    var buf bytes.Buffer
-    checker := &CoverageChecker{
-        Logger: log.New(&buf, "", 0),
-        Fs:     afero.NewMemMapFs(),
-    }
-    return checker, &buf
-}
-```
-
-## Deterministic Time
-
-`CreateMainLogger` accepts `time.Time` for predictable log paths:
-
-```go
-func fixedTime() time.Time {
-    return time.Date(2025, 6, 15, 14, 30, 45, 0, time.UTC)
-}
-
-func TestCreateMainLogger_DeterministicLogPath(t *testing.T) {
-    _, logPath, cleanup, err := CreateMainLogger("backup.yaml", true, fixedTime())
-    require.NoError(t, err)
-    defer cleanup()
-    assert.Equal(t, "logs/sync-2025-06-15T14-30-45-backup-sim", logPath)
-}
-```
+Mock configuration: `.mockery.yml`. See `MOCKERY_INTEGRATION.md` for regeneration instructions.
 
 ## Integration Tests
 
-Integration tests live in `cmd/test/integration_test.go` behind the `//go:build integration` tag. They exercise the full CLI with **real rsync** against temp directories — no mocks or stubs.
-
-### Build Tag
-
-```go
-//go:build integration
-```
-
-Tests are excluded from `make test` and `make check-coverage`. Run them separately:
+Integration tests are gated behind a build tag (`//go:build integration`). They exercise the full CLI with real rsync against temp directories — no mocks or stubs.
 
 ```sh
-make test-integration   # go test -race -tags=integration ./... -v
+make test-integration
 ```
 
-### Design Principles
+Design principles:
+- Real filesystem via `t.TempDir()`, real rsync via production command builder
+- Each test sets up its own isolated directory pair
+- Config built using the shared `testutil` builder
 
-- **Real rsync** — uses `/usr/bin/rsync` via `BuildRootCommand()` (production defaults)
-- **Real filesystem** — creates temp directories via `t.TempDir()`, cleaned up automatically
-- **Reproducible** — each test sets up its own isolated source/target directory pair
-- **No mocks** — validates actual rsync behavior (file transfer, deletion, exclusions)
-
-### Scenarios Covered
-
-| Category             | Tests                                                                            | What's Verified                                                                 |
-| -------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **run — basic**      | `BasicSync`, `IdempotentSync`, `PartialChanges`, `EmptySource`, `DeepHierarchy`  | Files are synced correctly; re-sync is idempotent; only modified files transfer |
-| **run — delete**     | `DeleteRemovesExtraFiles`, `NoDeletePreservesExtraFiles`                         | `--delete` flag removes stale files; omitting it preserves them                 |
-| **run — exclusions** | `Exclusions`                                                                     | `--exclude` patterns prevent syncing of matching paths                          |
-| **run — jobs**       | `DisabledJobSkipped`, `MultipleJobs`, `MixedJobsSummary`, `VariableSubstitution` | Multi-job orchestration, enabled/disabled, `${var}` resolution                  |
-| **simulate**         | `NoChanges`, `ShowsChanges`, `SimulateThenRun`                                   | Dry-run produces no side effects; subsequent run works normally                 |
-| **list**             | `ShowsCommands`                                                                  | Prints rsync commands without executing them                                    |
-| **check-coverage**   | `FullCoverage`, `IncompleteCoverage`                                             | Coverage checker on real directory trees                                        |
-| **config**           | `ConfigShow`, `ConfigValidate_Valid`, `ConfigValidate_OverlappingSources`        | End-to-end config parsing and validation                                        |
-| **version**          | `Version`                                                                        | Real rsync version output                                                       |
-
-### Example
-
-```go
-func TestIntegration_Run_BasicSync(t *testing.T) {
-    src, dst := setupDirs(t)
-    writeFile(t, filepath.Join(src, "hello.txt"), "hello world")
-
-    cfgPath := writeIntegrationConfig(t, `
-sources:
-  - path: "`+src+`"
-targets:
-  - path: "`+dst+`"
-jobs:
-  - name: "basic"
-    source: "`+src+`/"
-    target: "`+dst+`/"
-    delete: false
-`)
-
-    stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
-    require.NoError(t, err)
-    assert.Contains(t, stdout, "Status [basic]: SUCCESS")
-    assert.Equal(t, "hello world", readFileContent(t, filepath.Join(dst, "hello.txt")))
-}
-```
+Scenarios covered: sync (basic, idempotent, partial, empty, deep), delete/preserve, exclusions, disabled/multiple jobs, variable substitution, simulate, list, check-coverage, config show/validate, version.
 
 ## Running Tests
 
 ```sh
-make test               # go test -race ./... -v (unit tests only)
-make test-integration   # go test -race -tags=integration ./... -v (includes integration)
-make check-coverage     # Fail if coverage < threshold (unit tests only)
-make report-coverage    # Generate HTML coverage report
+make test               # Unit tests
+make test-integration   # Integration tests (requires rsync)
+make check-coverage     # Fail if below threshold
+make report-coverage    # HTML coverage report
 ```
 
 ## Key Principles
 
 1. **Inject, don't hardcode** — all external dependencies go through interfaces
-2. **Never hit the real filesystem** in unit tests — use `afero.NewMemMapFs()`
-3. **Use `require` for errors, `assert` for values** — `require` stops the test on failure
-4. **Table-driven tests** for multiple input/output scenarios
-5. **Scope mocks to individual tests** — each test creates its own mock instance
-6. **Defer cleanup** — `CreateMainLogger` returns a cleanup function; always `defer` it
+2. **Never hit the real filesystem** in unit tests — use in-memory filesystem
+3. **`require` for errors, `assert` for values** — `require` stops the test on failure
+4. **Table-driven tests** for 2+ cases with same structure
+5. **Use shared builders** — avoid inline YAML and repeated struct literals
+6. **Scope mocks per test** — no shared mock state
+7. **Defer cleanup** for resources that return a cleanup function
+8. **Keep functions short** — use compact table entries and data-driven fields over closures
