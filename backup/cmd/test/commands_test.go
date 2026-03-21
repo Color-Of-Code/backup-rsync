@@ -85,6 +85,53 @@ func TestConfigShow_MissingFile(t *testing.T) {
 	assert.Contains(t, err.Error(), "loading config")
 }
 
+// --- missing config (shared pattern) ---
+
+func TestMissingConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{"list", []string{"list", "--config", "/nonexistent/config.yaml"}, "loading config"},
+		{"run", []string{"run", "--config", "/nonexistent/config.yaml"}, "loading config"},
+		{"simulate", []string{"simulate", "--config", "/nonexistent/config.yaml"}, "loading config"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := executeCommand(t, test.args...)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), test.wantErr)
+		})
+	}
+}
+
+// --- create logger error (shared pattern) ---
+
+func TestCreateLoggerError(t *testing.T) {
+	commands := []string{"run", "simulate"}
+
+	for _, command := range commands {
+		t.Run(command, func(t *testing.T) {
+			cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+				Source("/home").Target("/backup").
+				AddJob("docs", "/home/docs/", "/backup/docs/").
+				Build())
+
+			fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
+
+			shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
+
+			_, err := executeCommandWithDeps(t, fs, shell, command, "--config", cfgPath)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "creating logger")
+		})
+	}
+}
+
 func TestConfigShow_InvalidYAML(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, `{{{invalid yaml`)
 
@@ -128,40 +175,7 @@ func TestConfigValidate_DuplicateJobNames(t *testing.T) {
 	assert.Contains(t, err.Error(), "validating config")
 }
 
-// --- list ---
-
-func TestList_MissingConfig(t *testing.T) {
-	_, err := executeCommand(t, "list", "--config", "/nonexistent/config.yaml")
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "loading config")
-}
-
 // --- run ---
-
-func TestRun_MissingConfig(t *testing.T) {
-	_, err := executeCommand(t, "run", "--config", "/nonexistent/config.yaml")
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "loading config")
-}
-
-func TestRun_CreateLoggerError(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("docs", "/home/docs/", "/backup/docs/").
-		Build())
-
-	// Use a read-only filesystem to block log directory creation
-	fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
-
-	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
-
-	_, err := executeCommandWithDeps(t, fs, shell, "run", "--config", cfgPath)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "creating logger")
-}
 
 func TestRun_ValidConfig(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
@@ -180,30 +194,6 @@ func TestRun_ValidConfig(t *testing.T) {
 
 // --- simulate ---
 
-func TestSimulate_MissingConfig(t *testing.T) {
-	_, err := executeCommand(t, "simulate", "--config", "/nonexistent/config.yaml")
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "loading config")
-}
-
-func TestSimulate_CreateLoggerError(t *testing.T) {
-	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("docs", "/home/docs/", "/backup/docs/").
-		Build())
-
-	// Use a read-only filesystem to block log directory creation
-	fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
-
-	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
-
-	_, err := executeCommandWithDeps(t, fs, shell, "simulate", "--config", cfgPath)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "creating logger")
-}
-
 func TestSimulate_ValidConfig(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
 		Source("/home").Target("/backup").
@@ -221,18 +211,22 @@ func TestSimulate_ValidConfig(t *testing.T) {
 
 // --- version ---
 
-func TestVersion_InvalidRsyncPath(t *testing.T) {
-	_, err := executeCommand(t, "version", "--rsync-path", "not-absolute")
+func TestVersion_ErrorPaths(t *testing.T) {
+	tests := []struct {
+		name, rsyncPath string
+	}{
+		{"InvalidRsyncPath", "not-absolute"},
+		{"NonExistentRsyncPath", "/nonexistent/rsync"},
+	}
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "getting version info")
-}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := executeCommand(t, "version", "--rsync-path", test.rsyncPath)
 
-func TestVersion_NonExistentRsyncPath(t *testing.T) {
-	_, err := executeCommand(t, "version", "--rsync-path", "/nonexistent/rsync")
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "getting version info")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "getting version info")
+		})
+	}
 }
 
 // --- check-coverage ---

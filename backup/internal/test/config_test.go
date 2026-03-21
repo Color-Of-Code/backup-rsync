@@ -79,70 +79,62 @@ jobs:
 	}
 }
 
-func TestYAMLUnmarshalingDefaults_FieldsOmitted(t *testing.T) {
-	yamlData := `
+func TestYAMLUnmarshalingDefaults(t *testing.T) {
+	tests := []struct {
+		name     string
+		yaml     string
+		expected Job
+	}{
+		{
+			name: "FieldsOmitted",
+			yaml: `
 name: "test_job"
 source: "/source"
 target: "/target"
-`
-	expected := Job{
-		Name:    "test_job",
-		Source:  "/source",
-		Target:  "/target",
-		Delete:  true,
-		Enabled: true,
-	}
-
-	var job Job
-
-	err := yaml.Unmarshal([]byte(yamlData), &job)
-	require.NoError(t, err)
-	assert.Equal(t, expected, job)
-}
-
-func TestYAMLUnmarshalingDefaults_ExplicitFalseValues(t *testing.T) {
-	yamlData := `
+`,
+			expected: Job{
+				Name: "test_job", Source: "/source", Target: "/target",
+				Delete: true, Enabled: true,
+			},
+		},
+		{
+			name: "ExplicitFalseValues",
+			yaml: `
 name: "test_job"
 source: "/source"
 target: "/target"
 delete: false
 enabled: false
-`
-	expected := Job{
-		Name:    "test_job",
-		Source:  "/source",
-		Target:  "/target",
-		Delete:  false,
-		Enabled: false,
-	}
-
-	var job Job
-
-	err := yaml.Unmarshal([]byte(yamlData), &job)
-	require.NoError(t, err)
-	assert.Equal(t, expected, job)
-}
-
-func TestYAMLUnmarshalingDefaults_MixedValues(t *testing.T) {
-	yamlData := `
+`,
+			expected: Job{
+				Name: "test_job", Source: "/source", Target: "/target",
+				Delete: false, Enabled: false,
+			},
+		},
+		{
+			name: "MixedValues",
+			yaml: `
 name: "test_job"
 source: "/source"
 target: "/target"
 delete: false
-`
-	expected := Job{
-		Name:    "test_job",
-		Source:  "/source",
-		Target:  "/target",
-		Delete:  false,
-		Enabled: true, // default
+`,
+			expected: Job{
+				Name: "test_job", Source: "/source", Target: "/target",
+				Delete: false, Enabled: true,
+			},
+		},
 	}
 
-	var job Job
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var job Job
 
-	err := yaml.Unmarshal([]byte(yamlData), &job)
-	require.NoError(t, err)
-	assert.Equal(t, expected, job)
+			err := yaml.Unmarshal([]byte(test.yaml), &job)
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, job)
+		})
+	}
 }
 
 func TestSubstituteVariables(t *testing.T) {
@@ -156,170 +148,119 @@ func TestSubstituteVariables(t *testing.T) {
 	assert.Equal(t, expected, result, "SubstituteVariables result mismatch")
 }
 
-func TestValidateJobNames_ValidJobNames(t *testing.T) {
-	jobs := []Job{
-		{Name: "job1"},
-		{Name: "job2"},
+func TestValidateJobNames(t *testing.T) {
+	tests := []struct {
+		name    string
+		jobs    []Job
+		wantErr string
+	}{
+		{"ValidJobNames", []Job{{Name: "job1"}, {Name: "job2"}}, ""},
+		{"DuplicateJobNames", []Job{{Name: "job1"}, {Name: "job1"}}, "duplicate job name: job1"},
+		{"InvalidCharacters", []Job{{Name: "job 1"}}, "invalid characters in job name: job 1"},
+		{"MixedErrors", []Job{{Name: "job1"}, {Name: "job 1"}, {Name: "job1"}}, "duplicate job name: job1"},
 	}
 
-	err := ValidateJobNames(jobs)
-	assert.NoError(t, err)
-}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateJobNames(test.jobs)
 
-func TestValidateJobNames_DuplicateJobNames(t *testing.T) {
-	jobs := []Job{
-		{Name: "job1"},
-		{Name: "job1"},
+			if test.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
-
-	err := ValidateJobNames(jobs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate job name: job1")
 }
 
-func TestValidateJobNames_InvalidCharactersInJobName(t *testing.T) {
-	jobs := []Job{
-		{Name: "job 1"},
-	}
-
-	err := ValidateJobNames(jobs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid characters in job name: job 1")
-}
-
-func TestValidateJobNames_MixedErrors(t *testing.T) {
-	jobs := []Job{
-		{Name: "job1"},
-		{Name: "job 1"},
-		{Name: "job1"},
-	}
-
-	err := ValidateJobNames(jobs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate job name: job1")
-}
-
-func TestValidatePath_ValidSourcePath(t *testing.T) {
-	test := struct {
+func TestValidatePath(t *testing.T) {
+	tests := []struct {
+		name     string
 		jobPath  string
 		paths    []Path
 		pathType string
+		wantErr  string
 	}{
-		jobPath:  "/home/user/documents",
-		paths:    []Path{{Path: "/home/user"}},
-		pathType: "source",
-	}
-
-	err := ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
-
-	assert.NoError(t, err)
-}
-
-func TestValidatePath_InvalidSourcePath(t *testing.T) {
-	test := struct {
-		jobPath  string
-		paths    []Path
-		pathType string
-	}{
-		jobPath:  "/invalid/source",
-		paths:    []Path{{Path: "/home/user"}},
-		pathType: "source",
-	}
-
-	err := ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
-
-	require.Error(t, err)
-	assert.EqualError(t, err, "invalid path for job 'job1': source /invalid/source")
-}
-
-func TestValidatePath_ValidTargetPath(t *testing.T) {
-	test := struct {
-		jobPath  string
-		paths    []Path
-		pathType string
-	}{
-		jobPath:  "/mnt/backup/documents",
-		paths:    []Path{{Path: "/mnt/backup"}},
-		pathType: "target",
-	}
-
-	err := ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
-
-	assert.NoError(t, err)
-}
-
-func TestValidatePath_InvalidTargetPath(t *testing.T) {
-	test := struct {
-		jobPath  string
-		paths    []Path
-		pathType string
-	}{
-		jobPath:  "/invalid/target",
-		paths:    []Path{{Path: "/mnt/backup"}},
-		pathType: "target",
-	}
-
-	err := ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
-
-	require.Error(t, err)
-	assert.EqualError(t, err, "invalid path for job 'job1': target /invalid/target")
-}
-
-func TestValidatePaths_ValidPaths(t *testing.T) {
-	test := struct {
-		name         string
-		cfg          Config
-		expectsError bool
-	}{
-		name: "Valid paths",
-		cfg: Config{
-			Sources: []Path{
-				{Path: "/home/user"},
-			},
-			Targets: []Path{
-				{Path: "/mnt/backup"},
-			},
-			Jobs: []Job{
-				{Name: "job1", Source: "/home/user/documents", Target: "/mnt/backup/documents"},
-			},
+		{
+			name:     "ValidSourcePath",
+			jobPath:  "/home/user/documents",
+			paths:    []Path{{Path: "/home/user"}},
+			pathType: "source",
+		},
+		{
+			name:     "InvalidSourcePath",
+			jobPath:  "/invalid/source",
+			paths:    []Path{{Path: "/home/user"}},
+			pathType: "source",
+			wantErr:  "invalid path for job 'job1': source /invalid/source",
+		},
+		{
+			name:     "ValidTargetPath",
+			jobPath:  "/mnt/backup/documents",
+			paths:    []Path{{Path: "/mnt/backup"}},
+			pathType: "target",
+		},
+		{
+			name:     "InvalidTargetPath",
+			jobPath:  "/invalid/target",
+			paths:    []Path{{Path: "/mnt/backup"}},
+			pathType: "target",
+			wantErr:  "invalid path for job 'job1': target /invalid/target",
 		},
 	}
 
-	t.Run(test.name, func(t *testing.T) {
-		err := ValidatePaths(test.cfg)
-		assert.NoError(t, err)
-	})
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
+
+			if test.wantErr != "" {
+				require.Error(t, err)
+				assert.EqualError(t, err, test.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
-func TestValidatePaths_InvalidPaths(t *testing.T) {
-	test := struct {
-		name         string
-		cfg          Config
-		expectsError bool
-		errorMessage string
+func TestValidatePaths(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     Config
+		wantErr string
 	}{
-		name: "Invalid paths",
-		cfg: Config{
-			Sources: []Path{
-				{Path: "/home/user"},
-			},
-			Targets: []Path{
-				{Path: "/mnt/backup"},
-			},
-			Jobs: []Job{
-				{Name: "job1", Source: "/invalid/source", Target: "/invalid/target"},
+		{
+			name: "ValidPaths",
+			cfg: Config{
+				Sources: []Path{{Path: "/home/user"}},
+				Targets: []Path{{Path: "/mnt/backup"}},
+				Jobs:    []Job{{Name: "job1", Source: "/home/user/documents", Target: "/mnt/backup/documents"}},
 			},
 		},
-		errorMessage: "path validation failed: [" +
-			"invalid path for job 'job1': source /invalid/source " +
-			"invalid path for job 'job1': target /invalid/target]",
+		{
+			name: "InvalidPaths",
+			cfg: Config{
+				Sources: []Path{{Path: "/home/user"}},
+				Targets: []Path{{Path: "/mnt/backup"}},
+				Jobs:    []Job{{Name: "job1", Source: "/invalid/source", Target: "/invalid/target"}},
+			},
+			wantErr: "path validation failed",
+		},
 	}
 
-	t.Run(test.name, func(t *testing.T) {
-		err := ValidatePaths(test.cfg)
-		require.Error(t, err)
-		assert.EqualError(t, err, test.errorMessage)
-	})
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidatePaths(test.cfg)
+
+			if test.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestConfigString_ValidConfig(t *testing.T) {
@@ -364,91 +305,63 @@ func TestResolveConfig(t *testing.T) {
 	assert.Equal(t, "/backup/user/Pictures", resolvedCfg.Jobs[1].Target)
 }
 
-func TestLoadResolvedConfig_FileNotFound(t *testing.T) {
-	_, err := LoadResolvedConfig("/nonexistent/path/config.yaml")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to open config")
-}
+func TestLoadResolvedConfig(t *testing.T) {
+	tests := []struct {
+		name, config, wantErr, wantTarget string
+		wantJobs                          int
+	}{
+		{name: "FileNotFound", wantErr: "failed to open config"},
+		{name: "InvalidYAML", config: "{{invalid yaml", wantErr: "failed to parse YAML"},
+		{name: "DuplicateJobNames", wantErr: "duplicate job name: dup",
+			config: testutil.NewConfigBuilder().Source("/src").Target("/tgt").
+				AddJob("dup", "/src/a", "/tgt/a").AddJob("dup", "/src/b", "/tgt/b").Build()},
+		{name: "InvalidSourcePath", wantErr: "path validation failed",
+			config: testutil.NewConfigBuilder().Source("/home").Target("/backup").
+				AddJob("job1", "/invalid/source", "/backup/stuff").Build()},
+		{name: "OverlappingSourcePaths", wantErr: "job source path validation failed",
+			config: testutil.NewConfigBuilder().Source("/home").Target("/backup").
+				AddJob("parent", "/home/user", "/backup/user").
+				AddJob("child", "/home/user/docs", "/backup/docs").Build()},
+		{name: "OverlappingAllowedByExclusion", wantJobs: 2,
+			config: testutil.NewConfigBuilder().Source("/home").Target("/backup").
+				AddJob("parent", "/home/user", "/backup/user", testutil.Exclusions("docs")).
+				AddJob("child", "/home/user/docs", "/backup/docs").Build()},
+		{name: "OverlappingTargetPaths", wantErr: "job target path validation failed",
+			config: testutil.NewConfigBuilder().Source("/home").Target("/backup").
+				AddJob("job1", "/home/docs", "/backup/all").
+				AddJob("job2", "/home/photos", "/backup/all/photos").Build()},
+		{name: "ValidConfig", wantJobs: 1, wantTarget: "/backup/docs",
+			config: testutil.NewConfigBuilder().Source("/home").Target("/backup").
+				Variable("base", "/backup").AddJob("docs", "/home/docs", "${base}/docs").Build()},
+	}
 
-func TestLoadResolvedConfig_InvalidYAML(t *testing.T) {
-	path := testutil.WriteConfigFile(t, "{{invalid yaml")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := "/nonexistent/path/config.yaml"
+			if test.config != "" {
+				path = testutil.WriteConfigFile(t, test.config)
+			}
 
-	_, err := LoadResolvedConfig(path)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse YAML")
-}
+			cfg, err := LoadResolvedConfig(path)
 
-func TestLoadResolvedConfig_DuplicateJobNames(t *testing.T) {
-	path := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/src").Target("/tgt").
-		AddJob("dup", "/src/a", "/tgt/a").
-		AddJob("dup", "/src/b", "/tgt/b").
-		Build())
+			if test.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.wantErr)
 
-	_, err := LoadResolvedConfig(path)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "job validation failed")
-	assert.Contains(t, err.Error(), "duplicate job name: dup")
-}
+				return
+			}
 
-func TestLoadResolvedConfig_InvalidSourcePath(t *testing.T) {
-	path := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("job1", "/invalid/source", "/backup/stuff").
-		Build())
+			require.NoError(t, err)
 
-	_, err := LoadResolvedConfig(path)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "path validation failed")
-}
+			if test.wantJobs > 0 {
+				assert.Len(t, cfg.Jobs, test.wantJobs)
+			}
 
-func TestLoadResolvedConfig_OverlappingSourcePaths(t *testing.T) {
-	path := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("parent", "/home/user", "/backup/user").
-		AddJob("child", "/home/user/docs", "/backup/docs").
-		Build())
-
-	_, err := LoadResolvedConfig(path)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "job source path validation failed")
-}
-
-func TestLoadResolvedConfig_OverlappingSourcePathsAllowedByExclusion(t *testing.T) {
-	path := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("parent", "/home/user", "/backup/user", testutil.Exclusions("docs")).
-		AddJob("child", "/home/user/docs", "/backup/docs").
-		Build())
-
-	cfg, err := LoadResolvedConfig(path)
-	require.NoError(t, err)
-	assert.Len(t, cfg.Jobs, 2)
-}
-
-func TestLoadResolvedConfig_OverlappingTargetPaths(t *testing.T) {
-	path := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("job1", "/home/docs", "/backup/all").
-		AddJob("job2", "/home/photos", "/backup/all/photos").
-		Build())
-
-	_, err := LoadResolvedConfig(path)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "job target path validation failed")
-}
-
-func TestLoadResolvedConfig_ValidConfig(t *testing.T) {
-	path := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		Variable("base", "/backup").
-		AddJob("docs", "/home/docs", "${base}/docs").
-		Build())
-
-	cfg, err := LoadResolvedConfig(path)
-	require.NoError(t, err)
-	assert.Len(t, cfg.Jobs, 1)
-	assert.Equal(t, "/backup/docs", cfg.Jobs[0].Target)
+			if test.wantTarget != "" {
+				assert.Equal(t, test.wantTarget, cfg.Jobs[0].Target)
+			}
+		})
+	}
 }
 
 func TestConfigApply_VersionInfoSuccess(t *testing.T) {

@@ -19,136 +19,99 @@ var errCommandNotFound = errors.New("command not found")
 const rsyncPath = "/usr/bin/rsync"
 
 func TestArgumentsForJob(t *testing.T) {
-	job := Job{
-		Delete:     true,
-		Source:     "/home/user/Music/",
-		Target:     "/target/user/music/home",
-		Exclusions: []string{"*.tmp", "node_modules/"},
+	tests := []struct {
+		name     string
+		job      Job
+		logPath  string
+		simulate bool
+		wantArgs []string
+	}{
+		{
+			name: "SimulateWithDelete",
+			job: Job{
+				Delete: true, Source: "/home/user/Music/", Target: "/target/user/music/home",
+				Exclusions: []string{"*.tmp", "node_modules/"},
+			},
+			simulate: true,
+			wantArgs: []string{
+				"--dry-run", "-aiv", "--stats", "--delete",
+				"--exclude=*.tmp", "--exclude=node_modules/",
+				"/home/user/Music/", "/target/user/music/home",
+			},
+		},
+		{
+			name: "RealWithLogPath",
+			job: Job{
+				Delete: false, Source: "/home/user/Documents/", Target: "/backup/user/documents",
+				Exclusions: []string{"*.log", "temp/"},
+			},
+			logPath: "/var/log/rsync.log",
+			wantArgs: []string{
+				"-aiv", "--stats",
+				"--log-file=/var/log/rsync.log",
+				"--exclude=*.log", "--exclude=temp/",
+				"/home/user/Documents/", "/backup/user/documents",
+			},
+		},
 	}
-	args := ArgumentsForJob(job, "", true)
 
-	expectedArgs := []string{
-		"--dry-run", "-aiv", "--stats", "--delete",
-		"--exclude=*.tmp", "--exclude=node_modules/",
-		"/home/user/Music/", "/target/user/music/home",
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := ArgumentsForJob(test.job, test.logPath, test.simulate)
+
+			assert.Equal(t, strings.Join(test.wantArgs, " "), strings.Join(args, " "))
+		})
 	}
-
-	assert.Equal(t, strings.Join(expectedArgs, " "), strings.Join(args, " "))
 }
 
-func TestArgumentsForJob_WithLogPath_(t *testing.T) {
-	job := Job{
-		Delete:     false,
-		Source:     "/home/user/Documents/",
-		Target:     "/backup/user/documents",
-		Exclusions: []string{"*.log", "temp/"},
-	}
-	args := ArgumentsForJob(job, "/var/log/rsync.log", false)
-
-	expectedArgs := []string{
-		"-aiv", "--stats",
-		"--log-file=/var/log/rsync.log",
-		"--exclude=*.log", "--exclude=temp/",
-		"/home/user/Documents/", "/backup/user/documents",
-	}
-
-	assert.Equal(t, strings.Join(expectedArgs, " "), strings.Join(args, " "))
-}
-
-func TestGetVersionInfo_Success(t *testing.T) {
-	mockExec := NewMockExec(t)
-	rsync := SharedCommand{
-		BinPath: rsyncPath,
-		Shell:   mockExec,
-		Output:  io.Discard,
+func TestGetVersionInfo(t *testing.T) {
+	tests := []struct {
+		name, binPath, wantVersion, wantPath, wantErr string
+		mockOutput                                    []byte
+		mockErr                                       error
+	}{
+		{name: "Success", binPath: rsyncPath,
+			mockOutput:  []byte("rsync  version 3.2.3  protocol version 31\n"),
+			wantVersion: "rsync  version 3.2.3  protocol version 31\n", wantPath: rsyncPath},
+		{name: "CommandError", binPath: rsyncPath,
+			mockErr: errCommandNotFound, wantErr: "error fetching rsync version"},
+		{name: "InvalidOutput", binPath: rsyncPath,
+			mockOutput: []byte("invalid output"), wantErr: "invalid rsync version output"},
+		{name: "EmptyPath",
+			wantErr: `rsync path must be an absolute path: ""`},
+		{name: "IncompletePath", binPath: "bin/rsync",
+			wantErr: `rsync path must be an absolute path: "bin/rsync"`},
 	}
 
-	// Set expectation for Execute call
-	mockExec.EXPECT().Execute(rsyncPath, mock.MatchedBy(func(args []string) bool {
-		return len(args) == 1 && args[0] == RsyncVersionFlag
-	})).Return([]byte("rsync  version 3.2.3  protocol version 31\n"), nil).Once()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockExec := NewMockExec(t)
+			rsync := SharedCommand{
+				BinPath: test.binPath,
+				Shell:   mockExec,
+				Output:  io.Discard,
+			}
 
-	versionInfo, fullpath, err := rsync.GetVersionInfo()
+			if strings.HasPrefix(test.binPath, "/") {
+				mockExec.EXPECT().Execute(rsyncPath, mock.MatchedBy(func(args []string) bool {
+					return len(args) == 1 && args[0] == RsyncVersionFlag
+				})).Return(test.mockOutput, test.mockErr).Once()
+			}
 
-	require.NoError(t, err)
-	assert.Equal(t, rsyncPath, fullpath)
-	assert.Equal(t, "rsync  version 3.2.3  protocol version 31\n", versionInfo)
-}
+			versionInfo, fullpath, err := rsync.GetVersionInfo()
 
-func TestGetVersionInfo_CommandError(t *testing.T) {
-	mockExec := NewMockExec(t)
-	rsync := SharedCommand{
-		BinPath: rsyncPath,
-		Shell:   mockExec,
-		Output:  io.Discard,
+			if test.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.wantErr)
+				assert.Empty(t, versionInfo)
+				assert.Empty(t, fullpath)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, test.wantPath, fullpath)
+				assert.Equal(t, test.wantVersion, versionInfo)
+			}
+		})
 	}
-
-	// Set expectation for Execute call to return error
-	mockExec.EXPECT().Execute(rsyncPath, mock.MatchedBy(func(args []string) bool {
-		return len(args) == 1 && args[0] == RsyncVersionFlag
-	})).Return(nil, errCommandNotFound).Once()
-
-	versionInfo, fullpath, err := rsync.GetVersionInfo()
-
-	require.Error(t, err)
-	assert.Empty(t, fullpath)
-	assert.Empty(t, versionInfo)
-}
-
-func TestGetVersionInfo_InvalidOutput(t *testing.T) {
-	mockExec := NewMockExec(t)
-	rsync := SharedCommand{
-		BinPath: rsyncPath,
-		Shell:   mockExec,
-		Output:  io.Discard,
-	}
-
-	// Set expectation for Execute call to return invalid output
-	mockExec.EXPECT().Execute(rsyncPath, mock.MatchedBy(func(args []string) bool {
-		return len(args) == 1 && args[0] == RsyncVersionFlag
-	})).Return([]byte("invalid output"), nil).Once()
-
-	versionInfo, fullpath, err := rsync.GetVersionInfo()
-
-	require.Error(t, err)
-	assert.Empty(t, fullpath)
-	assert.Empty(t, versionInfo)
-}
-
-func TestGetVersionInfo_EmptyPath(t *testing.T) {
-	mockExec := NewMockExec(t)
-	rsync := SharedCommand{
-		BinPath: "",
-		Shell:   mockExec,
-		Output:  io.Discard,
-	}
-
-	// No expectations set - should fail before calling Execute due to path validation
-
-	versionInfo, fullpath, err := rsync.GetVersionInfo()
-
-	require.Error(t, err)
-	require.EqualError(t, err, "rsync path must be an absolute path: \"\"")
-	assert.Empty(t, versionInfo)
-	assert.Empty(t, fullpath)
-}
-
-func TestGetVersionInfo_IncompletePath(t *testing.T) {
-	mockExec := NewMockExec(t)
-	rsync := SharedCommand{
-		BinPath: "bin/rsync",
-		Shell:   mockExec,
-		Output:  io.Discard,
-	}
-
-	// No expectations set - should fail before calling Execute due to path validation
-
-	versionInfo, fullpath, err := rsync.GetVersionInfo()
-
-	require.Error(t, err)
-	require.EqualError(t, err, "rsync path must be an absolute path: \"bin/rsync\"")
-	assert.Empty(t, versionInfo)
-	assert.Empty(t, fullpath)
 }
 
 func TestNewSharedCommand(t *testing.T) {

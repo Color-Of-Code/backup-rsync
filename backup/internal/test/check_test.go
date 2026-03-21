@@ -28,72 +28,38 @@ func newSilentChecker(fs afero.Fs) *CoverageChecker {
 	}
 }
 
-func TestIsExcludedGlobally_PathGloballyExcluded(t *testing.T) {
+func TestIsExcludedGlobally(t *testing.T) {
 	sources := []Path{
-		{
-			Path:       "/home/data/",
-			Exclusions: []string{"/projects/P1/", "/media/"},
-		},
-		{
-			Path:       "/home/user/",
-			Exclusions: []string{"/cache/", "/npm/"},
-		},
+		{Path: "/home/data/", Exclusions: []string{"/projects/P1/", "/media/"}},
+		{Path: "/home/user/", Exclusions: []string{"/cache/", "/npm/"}},
 	}
 
-	var logBuffer bytes.Buffer
-
-	checker := newTestChecker(nil, &logBuffer)
-
-	path := "/home/data/projects/P1"
-	expectedLog := "Path '/home/data/projects/P1' is globally excluded by '/projects/P1/' in source '/home/data/'"
-
-	result := checker.IsExcludedGlobally(path, sources)
-	assert.True(t, result)
-	assert.Contains(t, logBuffer.String(), expectedLog)
-}
-
-func TestIsExcludedGlobally_PathNotExcluded(t *testing.T) {
-	sources := []Path{
-		{
-			Path:       "/home/data/",
-			Exclusions: []string{"/projects/P1/", "/media/"},
-		},
-		{
-			Path:       "/home/user/",
-			Exclusions: []string{"/cache/", "/npm/"},
-		},
+	tests := []struct {
+		name, path, wantLog string
+		want                bool
+	}{
+		{"PathGloballyExcluded", "/home/data/projects/P1",
+			"globally excluded by '/projects/P1/' in source '/home/data/'", true},
+		{"PathNotExcluded", "/home/data/projects/Other", "", false},
+		{"PathExcludedInAnotherSource", "/home/user/cache",
+			"globally excluded by '/cache/' in source '/home/user/'", true},
 	}
 
-	checker := newSilentChecker(nil)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var logBuf bytes.Buffer
 
-	path := "/home/data/projects/Other"
+			checker := newTestChecker(nil, &logBuf)
 
-	result := checker.IsExcludedGlobally(path, sources)
-	assert.False(t, result)
-}
+			result := checker.IsExcludedGlobally(test.path, sources)
 
-func TestIsExcludedGlobally_PathExcludedInAnotherSource(t *testing.T) {
-	sources := []Path{
-		{
-			Path:       "/home/data/",
-			Exclusions: []string{"/projects/P1/", "/media/"},
-		},
-		{
-			Path:       "/home/user/",
-			Exclusions: []string{"/cache/", "/npm/"},
-		},
+			assert.Equal(t, test.want, result)
+
+			if test.wantLog != "" {
+				assert.Contains(t, logBuf.String(), test.wantLog)
+			}
+		})
 	}
-
-	var logBuffer bytes.Buffer
-
-	checker := newTestChecker(nil, &logBuffer)
-
-	path := "/home/user/cache"
-	expectedLog := "Path '/home/user/cache' is globally excluded by '/cache/' in source '/home/user/'"
-
-	result := checker.IsExcludedGlobally(path, sources)
-	assert.True(t, result)
-	assert.Contains(t, logBuffer.String(), expectedLog)
 }
 
 func runListUncoveredPathsTest(
@@ -128,87 +94,62 @@ func runListUncoveredPathsTest(
 	assert.ElementsMatch(t, expectedUncoveredPaths, uncoveredPaths)
 }
 
-// Variation: all paths used.
-func TestListUncoveredPathsVariationsAllCovered(t *testing.T) {
-	runListUncoveredPathsTest(t,
-		map[string][]string{
-			"/var/log": {"app1", "app2"},
-			"/tmp":     {"cache", "temp"},
-		},
-		Config{
-			Sources: []Path{
-				{Path: "/var/log"},
-				{Path: "/tmp"},
-			},
-			Jobs: []Job{
-				{Name: "Job1", Source: "/var/log"},
-				{Name: "Job2", Source: "/tmp"},
+func TestListUncoveredPathsVariations(t *testing.T) {
+	tests := []struct {
+		name      string
+		fakeFS    map[string][]string
+		cfg       Config
+		wantPaths []string
+	}{
+		{
+			name:   "AllCovered",
+			fakeFS: map[string][]string{"/var/log": {"app1", "app2"}, "/tmp": {"cache", "temp"}},
+			cfg: Config{
+				Sources: []Path{{Path: "/var/log"}, {Path: "/tmp"}},
+				Jobs:    []Job{{Name: "Job1", Source: "/var/log"}, {Name: "Job2", Source: "/tmp"}},
 			},
 		},
-		[]string{},
-	)
-}
+		{
+			name: "OneCoveredOneUncovered",
+			fakeFS: map[string][]string{
+				"/home/data": {"projects", "media"}, "/home/user": {"cache", "npm"},
+				"/home/user/cache": {}, "/home/user/npm": {},
+			},
+			cfg: Config{
+				Sources: []Path{{Path: "/home/data"}, {Path: "/home/user"}},
+				Jobs:    []Job{{Name: "Job1", Source: "/home/data"}},
+			},
+			wantPaths: []string{"/home/user"},
+		},
+		{
+			name:   "UncoveredExcluded",
+			fakeFS: map[string][]string{"/home/data": {"projects", "media"}},
+			cfg: Config{
+				Sources: []Path{{Path: "/home/data", Exclusions: []string{"media"}}},
+				Jobs:    []Job{{Name: "Job1", Source: "/home/data/projects"}},
+			},
+		},
+		{
+			name: "SubfoldersCovered",
+			fakeFS: map[string][]string{
+				"/home/data": {"family"}, "/home/data/family": {"me", "you"},
+				"/home/data/family/me": {"a"}, "/home/data/family/you": {"a"},
+			},
+			cfg: Config{
+				Sources: []Path{{Path: "/home/data"}},
+				Jobs: []Job{
+					{Name: "JobMe", Source: "/home/data/family/me"},
+					{Name: "JobYou", Source: "/home/data/family/you"},
+				},
+			},
+		},
+	}
 
-// Variation: one source covered, one uncovered.
-func TestListUncoveredPathsVariationsOneCoveredOneUncovered(t *testing.T) {
-	runListUncoveredPathsTest(t,
-		map[string][]string{
-			"/home/data":       {"projects", "media"},
-			"/home/user":       {"cache", "npm"},
-			"/home/user/cache": {},
-			"/home/user/npm":   {},
-		},
-		Config{
-			Sources: []Path{
-				{Path: "/home/data"},
-				{Path: "/home/user"},
-			},
-			Jobs: []Job{
-				{Name: "Job1", Source: "/home/data"},
-			},
-		},
-		[]string{"/home/user"},
-	)
-}
-
-// Variation: one source covered, one uncovered but excluded.
-func TestListUncoveredPathsVariationsUncoveredExcluded(t *testing.T) {
-	runListUncoveredPathsTest(t,
-		map[string][]string{
-			"/home/data": {"projects", "media"},
-		},
-		Config{
-			Sources: []Path{
-				{Path: "/home/data", Exclusions: []string{"media"}},
-			},
-			Jobs: []Job{
-				{Name: "Job1", Source: "/home/data/projects"},
-			},
-		},
-		[]string{},
-	)
-}
-
-// Variation: one source covered, subfolders covered.
-func TestListUncoveredPathsVariationsSubfoldersCovered(t *testing.T) {
-	runListUncoveredPathsTest(t,
-		map[string][]string{
-			"/home/data":            {"family"},
-			"/home/data/family":     {"me", "you"},
-			"/home/data/family/me":  {"a"},
-			"/home/data/family/you": {"a"},
-		},
-		Config{
-			Sources: []Path{
-				{Path: "/home/data"},
-			},
-			Jobs: []Job{
-				{Name: "JobMe", Source: "/home/data/family/me"},
-				{Name: "JobYou", Source: "/home/data/family/you"},
-			},
-		},
-		[]string{},
-	)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			runListUncoveredPathsTest(t, test.fakeFS, test.cfg, test.wantPaths)
+		})
+	}
 }
 
 func TestListUncoveredPathsVariationsSubfoldersPartiallyCovered(t *testing.T) {

@@ -9,8 +9,6 @@ linters:
     - errcheck
     - forbidigo
   settings:
-    dupl:
-      threshold: 200
     depguard:
       rules:
         main:
