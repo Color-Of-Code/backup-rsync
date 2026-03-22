@@ -35,7 +35,9 @@ func fixedTime() time.Time {
 }
 
 func TestCreateMainLogger_Title_IsPresent(t *testing.T) {
-	logger, logPath, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), "title", true, fixedTime())
+	logPath := GetLogPath("title", fixedTime())
+
+	logger, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), logPath)
 	require.NoError(t, err)
 
 	defer cleanup()
@@ -44,37 +46,21 @@ func TestCreateMainLogger_Title_IsPresent(t *testing.T) {
 	assert.NotNil(t, logger)
 }
 
-func TestCreateMainLogger_IsSimulate_HasSimSuffix(t *testing.T) {
-	logger, logPath, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), "", true, fixedTime())
-	require.NoError(t, err)
-
-	defer cleanup()
-
-	assert.Contains(t, logPath, "-sim")
-	assert.NotNil(t, logger)
-}
-
-func TestCreateMainLogger_NotSimulate_HasNoSimSuffix(t *testing.T) {
-	logger, logPath, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), "", false, fixedTime())
-	require.NoError(t, err)
-
-	defer cleanup()
-
-	assert.NotContains(t, logPath, "-sim")
-	assert.NotNil(t, logger)
-}
-
 func TestCreateMainLogger_DeterministicLogPath(t *testing.T) {
-	_, logPath, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), "backup.yaml", true, fixedTime())
+	logPath := GetLogPath("backup.yaml", fixedTime())
+
+	_, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), logPath)
 	require.NoError(t, err)
 
 	defer cleanup()
 
-	assert.Equal(t, "logs/sync-2025-06-15T14-30-45-backup-sim", logPath)
+	assert.Equal(t, "logs/sync-2025-06-15T14-30-45-backup", logPath)
 }
 
-func TestCreateMainLogger_DeterministicLogPath_NoSimulate(t *testing.T) {
-	_, logPath, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), "sync.yaml", false, fixedTime())
+func TestCreateMainLogger_DeterministicLogPath_AnotherConfig(t *testing.T) {
+	logPath := GetLogPath("sync.yaml", fixedTime())
+
+	_, cleanup, err := CreateMainLogger(afero.NewMemMapFs(), logPath)
 	require.NoError(t, err)
 
 	defer cleanup()
@@ -85,8 +71,9 @@ func TestCreateMainLogger_DeterministicLogPath_NoSimulate(t *testing.T) {
 func TestCreateMainLogger_MkdirError(t *testing.T) {
 	// Use a read-only filesystem to block directory creation
 	fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
+	logPath := GetLogPath("test.yaml", fixedTime())
 
-	_, _, cleanup, err := CreateMainLogger(fs, "test.yaml", false, fixedTime())
+	_, cleanup, err := CreateMainLogger(fs, logPath)
 	_ = cleanup
 
 	require.Error(t, err)
@@ -95,12 +82,32 @@ func TestCreateMainLogger_MkdirError(t *testing.T) {
 
 func TestCreateMainLogger_OpenFileError(t *testing.T) {
 	fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
+	logPath := GetLogPath("test.yaml", fixedTime())
 
-	_, _, cleanup, err := CreateMainLogger(fs, "test.yaml", false, fixedTime())
+	_, cleanup, err := CreateMainLogger(fs, logPath)
 	_ = cleanup
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create log directory")
+}
+
+func TestGetLogPath(t *testing.T) {
+	tests := []struct {
+		name       string
+		configPath string
+		expected   string
+	}{
+		{"WithYamlExtension", "backup.yaml", "logs/sync-2025-06-15T14-30-45-backup"},
+		{"WithoutYamlExtension", "sync", "logs/sync-2025-06-15T14-30-45-sync"},
+		{"WithDirectoryPrefix", "/etc/configs/media.yaml", "logs/sync-2025-06-15T14-30-45-media"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := GetLogPath(test.configPath, fixedTime())
+			assert.Equal(t, test.expected, result)
+		})
+	}
 }
 
 func TestUTCLogWriter_FormatsISO8601UTC(t *testing.T) {

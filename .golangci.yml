@@ -44,6 +44,9 @@ linters:
     varnamelen:
       ignore-decls:
         - fs afero.Fs
+    wrapcheck:
+      ignore-package-globs:
+        - backup-rsync/*
 formatters:
   enable:
     - gofmt

@@ -48,32 +48,26 @@ func NormalizePath(path string) string {
 const LogFilePermission = 0644
 const LogDirPermission = 0755
 
-func getLogPath(simulate bool, configPath string, now time.Time) string {
+func GetLogPath(configPath string, now time.Time) string {
 	filename := filepath.Base(configPath)
 	filename = strings.TrimSuffix(filename, ".yaml")
-	logPath := "logs/sync-" + now.Format("2006-01-02T15-04-05") + "-" + filename
 
-	if simulate {
-		logPath += "-sim"
-	}
-
-	return logPath
+	return "logs/sync-" + now.Format("2006-01-02T15-04-05") + "-" + filename
 }
 
 func CreateMainLogger(
-	fs afero.Fs, configPath string, simulate bool, now time.Time,
-) (*log.Logger, string, func() error, error) {
-	logPath := getLogPath(simulate, configPath, now)
+	fs afero.Fs, logPath string,
+) (*log.Logger, func() error, error) {
 	overallLogPath := logPath + "/summary.log"
 
 	err := fs.MkdirAll(logPath, LogDirPermission)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to create log directory: %w", err)
+		return nil, nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
 
 	overallLogFile, err := fs.OpenFile(overallLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, LogFilePermission)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to open overall log file: %w", err)
+		return nil, nil, fmt.Errorf("failed to open overall log file: %w", err)
 	}
 
 	logger := NewUTCLogger(overallLogFile)
@@ -82,5 +76,5 @@ func CreateMainLogger(
 		return overallLogFile.Close()
 	}
 
-	return logger, logPath, cleanup, nil
+	return logger, cleanup, nil
 }

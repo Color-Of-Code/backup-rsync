@@ -11,12 +11,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// LoggerFactory creates a logger, returning the logger, log directory path, cleanup function, and any error.
+type LoggerFactory func(fs afero.Fs, configPath string, now time.Time) (*log.Logger, string, func() error, error)
+
+func discardLoggerFactory(_ afero.Fs, _ string, _ time.Time) (*log.Logger, string, func() error, error) {
+	return log.New(io.Discard, "", 0), "", func() error { return nil }, nil
+}
+
 type jobCommandOptions struct {
-	use      string
-	short    string
-	needsLog bool
-	simulate bool
-	factory  func(rsyncPath string, logPath string, out io.Writer) internal.JobCommand
+	use          string
+	short        string
+	factory      func(rsyncPath string, logPath string, out io.Writer) internal.JobCommand
+	createLogger LoggerFactory
 }
 
 func buildJobCommand(fs afero.Fs, opts jobCommandOptions) *cobra.Command {
@@ -33,20 +39,18 @@ func buildJobCommand(fs afero.Fs, opts jobCommandOptions) *cobra.Command {
 			}
 
 			out := cmd.OutOrStdout()
-			logger := log.New(io.Discard, "", 0)
 
-			var logPath string
-
-			if opts.needsLog {
-				var cleanup func() error
-
-				logger, logPath, cleanup, err = internal.CreateMainLogger(fs, configPath, opts.simulate, time.Now())
-				if err != nil {
-					return fmt.Errorf("creating logger: %w", err)
-				}
-
-				defer cleanup()
+			createLogger := opts.createLogger
+			if createLogger == nil {
+				createLogger = discardLoggerFactory
 			}
+
+			logger, logPath, cleanup, err := createLogger(fs, configPath, time.Now())
+			if err != nil {
+				return fmt.Errorf("creating logger: %w", err)
+			}
+
+			defer cleanup()
 
 			command := opts.factory(rsyncPath, logPath, out)
 
