@@ -50,7 +50,7 @@ func buildJobCommand(fs afero.Fs, opts jobCommandOptions) *cobra.Command {
 
 			command := opts.factory(rsyncPath, logPath, out)
 
-			return cfg.Apply(command, logger, out)
+			return cfg.Apply(command, logger)
 		},
 	}
 }

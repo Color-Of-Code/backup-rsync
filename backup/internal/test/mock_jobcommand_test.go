@@ -6,6 +6,7 @@ package internal_test
 
 import (
 	"backup-rsync/backup/internal"
+	"log"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -93,6 +94,104 @@ func (_c *MockJobCommand_GetVersionInfo_Call) Return(s string, s1 string, err er
 
 func (_c *MockJobCommand_GetVersionInfo_Call) RunAndReturn(run func() (string, string, error)) *MockJobCommand_GetVersionInfo_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// ReportJobStatus provides a mock function for the type MockJobCommand
+func (_mock *MockJobCommand) ReportJobStatus(jobName string, status internal.JobStatus, logger *log.Logger) {
+	_mock.Called(jobName, status, logger)
+	return
+}
+
+// MockJobCommand_ReportJobStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReportJobStatus'
+type MockJobCommand_ReportJobStatus_Call struct {
+	*mock.Call
+}
+
+// ReportJobStatus is a helper method to define mock.On call
+//   - jobName string
+//   - status internal.JobStatus
+//   - logger *log.Logger
+func (_e *MockJobCommand_Expecter) ReportJobStatus(jobName interface{}, status interface{}, logger interface{}) *MockJobCommand_ReportJobStatus_Call {
+	return &MockJobCommand_ReportJobStatus_Call{Call: _e.mock.On("ReportJobStatus", jobName, status, logger)}
+}
+
+func (_c *MockJobCommand_ReportJobStatus_Call) Run(run func(jobName string, status internal.JobStatus, logger *log.Logger)) *MockJobCommand_ReportJobStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 internal.JobStatus
+		if args[1] != nil {
+			arg1 = args[1].(internal.JobStatus)
+		}
+		var arg2 *log.Logger
+		if args[2] != nil {
+			arg2 = args[2].(*log.Logger)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockJobCommand_ReportJobStatus_Call) Return() *MockJobCommand_ReportJobStatus_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockJobCommand_ReportJobStatus_Call) RunAndReturn(run func(jobName string, status internal.JobStatus, logger *log.Logger)) *MockJobCommand_ReportJobStatus_Call {
+	_c.Run(run)
+	return _c
+}
+
+// ReportSummary provides a mock function for the type MockJobCommand
+func (_mock *MockJobCommand) ReportSummary(counts map[internal.JobStatus]int, logger *log.Logger) {
+	_mock.Called(counts, logger)
+	return
+}
+
+// MockJobCommand_ReportSummary_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReportSummary'
+type MockJobCommand_ReportSummary_Call struct {
+	*mock.Call
+}
+
+// ReportSummary is a helper method to define mock.On call
+//   - counts map[internal.JobStatus]int
+//   - logger *log.Logger
+func (_e *MockJobCommand_Expecter) ReportSummary(counts interface{}, logger interface{}) *MockJobCommand_ReportSummary_Call {
+	return &MockJobCommand_ReportSummary_Call{Call: _e.mock.On("ReportSummary", counts, logger)}
+}
+
+func (_c *MockJobCommand_ReportSummary_Call) Run(run func(counts map[internal.JobStatus]int, logger *log.Logger)) *MockJobCommand_ReportSummary_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 map[internal.JobStatus]int
+		if args[0] != nil {
+			arg0 = args[0].(map[internal.JobStatus]int)
+		}
+		var arg1 *log.Logger
+		if args[1] != nil {
+			arg1 = args[1].(*log.Logger)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockJobCommand_ReportSummary_Call) Return() *MockJobCommand_ReportSummary_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockJobCommand_ReportSummary_Call) RunAndReturn(run func(counts map[internal.JobStatus]int, logger *log.Logger)) *MockJobCommand_ReportSummary_Call {
+	_c.Run(run)
 	return _c
 }
 

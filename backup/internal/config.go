@@ -39,7 +39,7 @@ func (cfg Config) String() string {
 	return string(out)
 }
 
-func (cfg Config) Apply(rsync JobCommand, logger *log.Logger, output io.Writer) error {
+func (cfg Config) Apply(rsync JobCommand, logger *log.Logger) error {
 	versionInfo, fullpath, err := rsync.GetVersionInfo()
 	if err != nil {
 		logger.Printf("Failed to fetch rsync version: %v", err)
@@ -52,15 +52,11 @@ func (cfg Config) Apply(rsync JobCommand, logger *log.Logger, output io.Writer) 
 
 	for _, job := range cfg.Jobs {
 		status := job.Apply(rsync)
-		logger.Printf("STATUS [%s]: %s", job.Name, status)
-		fmt.Fprintf(output, "Status [%s]: %s\n", job.Name, status)
+		rsync.ReportJobStatus(job.Name, status, logger)
 		counts[status]++
 	}
 
-	summary := fmt.Sprintf("Summary: %d succeeded, %d failed, %d skipped",
-		counts[Success], counts[Failure], counts[Skipped])
-	logger.Print(summary)
-	fmt.Fprintln(output, summary)
+	rsync.ReportSummary(counts, logger)
 
 	if counts[Failure] > 0 {
 		return fmt.Errorf("%w: %d of %d jobs", ErrJobFailure, counts[Failure], len(cfg.Jobs))

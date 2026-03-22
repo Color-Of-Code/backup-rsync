@@ -362,7 +362,8 @@ func TestIntegration_List_ShowsCommands(t *testing.T) {
 	assert.Contains(t, stdout, "--exclude=temp")
 	assert.Contains(t, stdout, src+"/")
 	assert.Contains(t, stdout, dst+"/")
-	assert.Contains(t, stdout, "Status [listjob]: SUCCESS")
+	assert.NotContains(t, stdout, "Status [listjob]:")
+	assert.NotContains(t, stdout, "Summary:")
 
 	// list should not actually sync files
 	assert.False(t, fileExists(t, filepath.Join(dst, "x.txt")), "list should not sync files")

@@ -367,8 +367,6 @@ func TestLoadResolvedConfig(t *testing.T) {
 func TestConfigApply_VersionInfoSuccess(t *testing.T) {
 	mockCmd := NewMockJobCommand(t)
 
-	var output bytes.Buffer
-
 	var logBuf bytes.Buffer
 
 	logger := log.New(&logBuf, "", 0)
@@ -382,23 +380,19 @@ func TestConfigApply_VersionInfoSuccess(t *testing.T) {
 
 	mockCmd.EXPECT().GetVersionInfo().Return("rsync version 3.2.3", "/usr/bin/rsync", nil).Once()
 	mockCmd.EXPECT().Run(mock.AnythingOfType("internal.Job")).Return(Success).Once()
+	mockCmd.EXPECT().ReportJobStatus("job1", Success, logger).Once()
+	mockCmd.EXPECT().ReportJobStatus("job2", Skipped, logger).Once()
+	mockCmd.EXPECT().ReportSummary(map[JobStatus]int{Success: 1, Skipped: 1}, logger).Once()
 
-	err := cfg.Apply(mockCmd, logger, &output)
+	err := cfg.Apply(mockCmd, logger)
 
 	require.NoError(t, err)
 	assert.Contains(t, logBuf.String(), "Rsync Binary Path: /usr/bin/rsync")
 	assert.Contains(t, logBuf.String(), "Rsync Version Info: rsync version 3.2.3")
-	assert.Contains(t, logBuf.String(), "STATUS [job1]: SUCCESS")
-	assert.Contains(t, logBuf.String(), "STATUS [job2]: SKIPPED")
-	assert.Contains(t, output.String(), "Status [job1]: SUCCESS")
-	assert.Contains(t, output.String(), "Status [job2]: SKIPPED")
-	assert.Contains(t, output.String(), "Summary: 1 succeeded, 0 failed, 1 skipped")
 }
 
 func TestConfigApply_VersionInfoError(t *testing.T) {
 	mockCmd := NewMockJobCommand(t)
-
-	var output bytes.Buffer
 
 	var logBuf bytes.Buffer
 
@@ -412,14 +406,13 @@ func TestConfigApply_VersionInfoError(t *testing.T) {
 
 	mockCmd.EXPECT().GetVersionInfo().Return("", "", errCommandNotFound).Once()
 	mockCmd.EXPECT().Run(mock.AnythingOfType("internal.Job")).Return(Failure).Once()
+	mockCmd.EXPECT().ReportJobStatus("backup", Failure, logger).Once()
+	mockCmd.EXPECT().ReportSummary(map[JobStatus]int{Failure: 1}, logger).Once()
 
-	err := cfg.Apply(mockCmd, logger, &output)
+	err := cfg.Apply(mockCmd, logger)
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrJobFailure)
 	assert.Contains(t, logBuf.String(), "Failed to fetch rsync version: command not found")
 	assert.NotContains(t, logBuf.String(), "Rsync Binary Path")
-	assert.Contains(t, logBuf.String(), "STATUS [backup]: FAILURE")
-	assert.Contains(t, output.String(), "Status [backup]: FAILURE")
-	assert.Contains(t, output.String(), "Summary: 0 succeeded, 1 failed, 0 skipped")
 }

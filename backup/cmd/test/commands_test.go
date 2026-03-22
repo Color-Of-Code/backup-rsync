@@ -310,7 +310,8 @@ func TestList_ValidConfig(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "Job: docs")
-	assert.Contains(t, stdout, "Status [docs]: SUCCESS")
+	assert.NotContains(t, stdout, "Status [docs]:")
+	assert.NotContains(t, stdout, "Summary:")
 }
 
 // --- run: logger cleanup happens after cfg.Apply completes ---
