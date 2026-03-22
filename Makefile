@@ -5,7 +5,7 @@ BUILD_CMD = CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -tags=prod
 PACKAGE = ./backup/main.go
 COVERAGE_THRESHOLD = 98
 
-.PHONY: build clean test test-integration lint tidy checksums release sanity-check check-mod-tidy lint-config-check  lint-fix format check-clean check-coverage
+.PHONY: build clean test test-integration lint tidy release sanity-check check-mod-tidy lint-config-check  lint-fix format check-clean check-coverage
 
 format:
 	go fmt ./...
@@ -55,21 +55,13 @@ release-%:
 	@mkdir -p dist
 	GOOS=$(word 1,$(subst -, ,$*)) GOARCH=$(word 2,$(subst -, ,$*)) $(BUILD_CMD) -o dist/backup-$* $(PACKAGE)
 
-checksums:
-	@for file in dist/*; do \
-		if [ "$${file##*.}" != "sha256" ]; then \
-			sha256sum "$$file" > "$$file.sha256"; \
-		fi; \
-	done
-
-release: release-linux-amd64 release-darwin-amd64 release-windows-amd64 checksums
+release: release-linux-amd64 release-darwin-amd64 release-windows-amd64
 	@echo
-	@echo "Binaries with sizes and checksums:"
+	@echo "Binaries with sizes:"
 	@for file in dist/*; do \
-		if [ -f "$$file" ] && [ "$${file##*.}" != "sha256" ]; then \
+		if [ -f "$$file" ]; then \
 			size=$$(stat --printf="%s" "$$file"); \
-			checksum=$$(cat "$$file.sha256" | awk '{print $$1}'); \
-			printf "%-40s %-15s %-64s\n" "$$file" "Size: $$size bytes" "Checksum: $$checksum"; \
+			printf "%-40s Size: %s bytes\n" "$$file" "$$size"; \
 		fi; \
 	done
 

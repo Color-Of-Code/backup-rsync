@@ -31,20 +31,11 @@ jobs:
       - name: Build binary
         run: make release-${{ matrix.goos }}-${{ matrix.goarch }}
 
-      - name: Generate SHA256 checksum
-        run: make checksums
-
       - name: Upload binaries
         uses: actions/upload-artifact@v5
         with:
           name: backup-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/backup-${{ matrix.goos }}-${{ matrix.goarch }}
-
-      - name: Upload SHA256 checksum files
-        uses: actions/upload-artifact@v5
-        with:
-          name: sha256-checksums-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: dist/*.sha256
 
   release:
     name: Publish Release
