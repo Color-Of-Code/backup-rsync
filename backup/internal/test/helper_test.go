@@ -1,6 +1,8 @@
 package internal_test
 
 import (
+	"bytes"
+	"errors"
 	"testing"
 	"time"
 
@@ -99,4 +101,69 @@ func TestCreateMainLogger_OpenFileError(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create log directory")
+}
+
+func TestUTCLogWriter_FormatsISO8601UTC(t *testing.T) {
+	var buf bytes.Buffer
+
+	writer := &UTCLogWriter{
+		W:   &buf,
+		Now: fixedTime,
+	}
+
+	_, err := writer.Write([]byte("hello\n"))
+	require.NoError(t, err)
+
+	assert.Equal(t, "2025-06-15T14:30:45Z hello\n", buf.String())
+}
+
+func TestUTCLogWriter_ConvertsToUTC(t *testing.T) {
+	var buf bytes.Buffer
+
+	eastern := time.FixedZone("EST", -5*60*60)
+	nonUTCTime := time.Date(2025, 6, 15, 10, 0, 0, 0, eastern)
+
+	writer := &UTCLogWriter{
+		W: &buf,
+		Now: func() time.Time {
+			return nonUTCTime
+		},
+	}
+
+	_, err := writer.Write([]byte("test\n"))
+	require.NoError(t, err)
+
+	assert.Equal(t, "2025-06-15T15:00:00Z test\n", buf.String())
+}
+
+var errWriteFailed = errors.New("write failed")
+
+type failWriter struct{}
+
+func (f *failWriter) Write(_ []byte) (int, error) {
+	return 0, errWriteFailed
+}
+
+func TestUTCLogWriter_PropagatesWriteError(t *testing.T) {
+	writer := &UTCLogWriter{
+		W:   &failWriter{},
+		Now: fixedTime,
+	}
+
+	_, err := writer.Write([]byte("hello\n"))
+
+	require.ErrorIs(t, err, errWriteFailed)
+}
+
+func TestNewUTCLogger_WritesISO8601(t *testing.T) {
+	var buf bytes.Buffer
+
+	logger := NewUTCLogger(&buf)
+
+	logger.Print("test message")
+
+	output := buf.String()
+	// Should contain ISO 8601 timestamp format (RFC3339) and the message
+	assert.Contains(t, output, "test message")
+	assert.Regexp(t, `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z `, output)
 }
