@@ -53,7 +53,7 @@ A lightweight exec stub (implementing the `Exec` interface inline) is used inste
 
 Generated mocks (via `mockery`) use the `.EXPECT()` pattern for setting expectations. Each test creates its own mock instance — no shared state between tests.
 
-Mock configuration: `.mockery.yml`. See `MOCKERY_INTEGRATION.md` for regeneration instructions.
+Mock configuration: `.mockery.yml`. See `mockery-integration.md` for regeneration instructions.
 
 ## Integration Tests
 

@@ -5,7 +5,7 @@ Thanks for your interest in contributing to backup-rsync!
 ## Getting Started
 
 1. Fork the repo and clone it
-2. Install Go 1.25+ and `rsync`
+2. Install Go (see `go.mod` for minimum version) and `rsync`
 3. Run `make build` to verify the setup
 
 ## Development Workflow

@@ -7,7 +7,7 @@ Built in Go with `cobra` for CLI, `afero` for filesystem abstraction, and YAML f
 
 ## Code Style
 
-- Go 1.25; follow idiomatic Go conventions
+- Follow idiomatic Go conventions (see `go.mod` for the required Go version)
 - Format with `go fmt`; lint with `golangci-lint` (config in `.golangci.yml`)
 - All linters enabled by default — check `.golangci.yml` for disabled ones
 - Keep packages focused: `cmd/` for CLI wiring, `internal/` for core logic
@@ -61,12 +61,12 @@ make report-coverage    # Generate HTML coverage report
 
 ## Testing Conventions
 
-- See `TESTING_GUIDE.md` for patterns and examples
+- See `docs/testing-guide.md` for patterns and examples
 - Use **dependency injection** — inject interfaces, not concrete types
 - **Mocks**: Generated with [mockery](https://github.com/vektra/mockery) (config: `.mockery.yml`)
   - Mock files live in `internal/test/` as `mock_<interface>_test.go`
   - Mock structs named `Mock<Interface>` (e.g., `MockExec`, `MockJobCommand`)
-  - See `MOCKERY_INTEGRATION.md` for setup details
+  - See `docs/mockery-integration.md` for setup details
 - Use `testify` for assertions (`require` / `assert`)
 - Test files live in `<package>/test/` subdirectories
 - Prefer table-driven tests for multiple input scenarios
