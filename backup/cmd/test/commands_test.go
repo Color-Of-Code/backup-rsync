@@ -66,8 +66,8 @@ func executeCommandWithDeps(t *testing.T, fs afero.Fs, shell internal.Exec, args
 
 func TestConfigShow_ValidConfig(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("docs", "/home/docs/", "/backup/docs/").
+		AddMapping("m", "/home", "/backup").
+		AddJobToMapping("docs", "docs", "docs").
 		Build())
 
 	stdout, err := executeCommand(t, "config", "show", "--config", cfgPath)
@@ -116,8 +116,8 @@ func TestCreateLoggerError(t *testing.T) {
 	for _, command := range commands {
 		t.Run(command, func(t *testing.T) {
 			cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-				Source("/home").Target("/backup").
-				AddJob("docs", "/home/docs/", "/backup/docs/").
+				AddMapping("m", "/home", "/backup").
+				AddJobToMapping("docs", "docs", "docs").
 				Build())
 
 			fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
@@ -145,8 +145,8 @@ func TestConfigShow_InvalidYAML(t *testing.T) {
 
 func TestConfigValidate_ValidConfig(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("docs", "/home/docs/", "/backup/docs/").
+		AddMapping("m", "/home", "/backup").
+		AddJobToMapping("docs", "docs", "docs").
 		Build())
 
 	stdout, err := executeCommand(t, "config", "validate", "--config", cfgPath)
@@ -164,9 +164,9 @@ func TestConfigValidate_MissingFile(t *testing.T) {
 
 func TestConfigValidate_DuplicateJobNames(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("same", "/home/a/", "/backup/a/").
-		AddJob("same", "/home/b/", "/backup/b/").
+		AddMapping("m", "/home", "/backup").
+		AddJobToMapping("same", "a", "a").
+		AddJobToMapping("same", "b", "b").
 		Build())
 
 	_, err := executeCommand(t, "config", "validate", "--config", cfgPath)
@@ -179,8 +179,8 @@ func TestConfigValidate_DuplicateJobNames(t *testing.T) {
 
 func TestRun_ValidConfig(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("docs", "/home/docs/", "/backup/docs/", testutil.Enabled(true), testutil.Delete(true)).
+		AddMapping("m", "/home", "/backup").
+		AddJobToMapping("docs", "docs", "docs", testutil.Enabled(true), testutil.Delete(true)).
 		Build())
 
 	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
@@ -196,8 +196,8 @@ func TestRun_ValidConfig(t *testing.T) {
 
 func TestSimulate_ValidConfig(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("docs", "/home/docs/", "/backup/docs/", testutil.Enabled(true)).
+		AddMapping("m", "/home", "/backup").
+		AddJobToMapping("docs", "docs", "docs", testutil.Enabled(true)).
 		Build())
 
 	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
@@ -240,8 +240,8 @@ func TestCheckCoverage_MissingConfig(t *testing.T) {
 
 func TestCheckCoverage_WithUncoveredPaths(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/src").Target("/dst").
-		AddJob("docs", "/src/docs/", "/dst/docs/").
+		AddMapping("m", "/src", "/dst").
+		AddJobToMapping("docs", "docs", "docs").
 		Build())
 
 	fs := afero.NewMemMapFs()
@@ -257,8 +257,8 @@ func TestCheckCoverage_WithUncoveredPaths(t *testing.T) {
 
 func TestCheckCoverage_ValidConfig(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/src").Target("/dst").
-		AddJob("docs", "/src/docs/", "/dst/docs/").
+		AddMapping("m", "/src", "/dst").
+		AddJobToMapping("docs", "docs", "docs").
 		Build())
 
 	fs := afero.NewMemMapFs()
@@ -300,8 +300,8 @@ func TestVersion_WithMockExec(t *testing.T) {
 
 func TestList_ValidConfig(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("docs", "/home/docs/", "/backup/docs/", testutil.Enabled(true)).
+		AddMapping("m", "/home", "/backup").
+		AddJobToMapping("docs", "docs", "docs", testutil.Enabled(true)).
 		Build())
 
 	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
@@ -318,8 +318,8 @@ func TestList_ValidConfig(t *testing.T) {
 
 func TestRun_LoggerOpenDuringApply(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home").Target("/backup").
-		AddJob("docs", "/home/docs/", "/backup/docs/", testutil.Enabled(true)).
+		AddMapping("m", "/home", "/backup").
+		AddJobToMapping("docs", "docs", "docs", testutil.Enabled(true)).
 		Build())
 
 	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
@@ -364,24 +364,24 @@ func TestRun_LoggerOpenDuringApply(t *testing.T) {
 
 func TestConfigShow_WithSetFlag(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home/${user}").Target("/backup/${user}").
 		Variable("user", "default").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build())
 
 	stdout, err := executeCommand(t, "config", "show", "--config", cfgPath, "--set", "user=alice")
 
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "alice_docs")
-	assert.Contains(t, stdout, "/home/alice/docs/")
-	assert.Contains(t, stdout, "/backup/alice/docs/")
+	assert.Contains(t, stdout, "/home/alice/docs")
+	assert.Contains(t, stdout, "/backup/alice/docs")
 	assert.NotContains(t, stdout, "${user}")
 }
 
 func TestConfigValidate_WithSetFlag(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build())
 
 	stdout, err := executeCommand(t, "config", "validate", "--config", cfgPath, "--set", "user=bob")
@@ -392,8 +392,8 @@ func TestConfigValidate_WithSetFlag(t *testing.T) {
 
 func TestList_WithSetFlag(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build())
 
 	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
@@ -410,8 +410,8 @@ func TestList_WithSetFlag(t *testing.T) {
 func TestConfigValidate_TemplateVarsMissing(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
 		TemplateVar("user").TemplateVar("user_cap").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("docs", "docs", "docs").
 		Build())
 
 	_, err := executeCommand(t, "config", "validate", "--config", cfgPath)
@@ -423,8 +423,8 @@ func TestConfigValidate_TemplateVarsMissing(t *testing.T) {
 func TestConfigValidate_TemplateVarsProvidedViaSet(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
 		TemplateVar("user").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build())
 
 	stdout, err := executeCommand(t, "config", "validate", "--config", cfgPath, "--set", "user=alice")
@@ -436,8 +436,8 @@ func TestConfigValidate_TemplateVarsProvidedViaSet(t *testing.T) {
 func TestConfigShow_TemplateVarsResolved(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
 		TemplateVar("user").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build())
 
 	stdout, err := executeCommand(t, "config", "show", "--config", cfgPath, "--set", "user=alice")
@@ -454,8 +454,8 @@ func TestConfigShow_WithInclude(t *testing.T) {
 
 	template := testutil.NewConfigBuilder().
 		TemplateVar("user").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build()
 	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
 
@@ -468,7 +468,7 @@ func TestConfigShow_WithInclude(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "alice_docs")
-	assert.Contains(t, stdout, "/home/alice/docs/")
+	assert.Contains(t, stdout, "/home/alice/docs")
 }
 
 func TestConfigValidate_WithInclude(t *testing.T) {
@@ -476,8 +476,8 @@ func TestConfigValidate_WithInclude(t *testing.T) {
 
 	template := testutil.NewConfigBuilder().
 		TemplateVar("user").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build()
 	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
 
@@ -497,8 +497,8 @@ func TestConfigValidate_IncludeMissingVars(t *testing.T) {
 
 	template := testutil.NewConfigBuilder().
 		TemplateVar("user").TemplateVar("user_cap").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("docs", "docs", "docs").
 		Build()
 	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
 
@@ -518,8 +518,8 @@ func TestList_WithInclude(t *testing.T) {
 
 	template := testutil.NewConfigBuilder().
 		TemplateVar("user").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build()
 	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
 

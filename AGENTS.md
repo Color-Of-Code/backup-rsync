@@ -36,7 +36,7 @@ backup/
 | `JobCommand`      | interface | `Run(job Job) JobStatus` + `GetVersionInfo()` — implemented by `ListCommand`, `SimulateCommand`, `SyncCommand` | `Exec` via constructors    |
 | `SharedCommand`   | struct    | Base for all commands — holds `BinPath`, `BaseLogPath`, `Shell Exec`, `Output io.Writer`                       | `io.Writer`, `Exec`        |
 | `CoverageChecker` | struct    | Analyzes path coverage                                                                                         | `*log.Logger`, `afero.Fs`  |
-| `Config`          | struct    | YAML config (`Config`, `Job`, `Path`, `${var}` substitution); custom `UnmarshalYAML` for job defaults          | `*log.Logger` in `Apply()` |
+| `Config`          | struct    | YAML config (`Config`, `Mapping`, `Job`, `Path`, `${var}` substitution); custom `UnmarshalYAML` for job defaults | `*log.Logger` in `Apply()` |
 
 Additional injection points: `afero.Fs` into `BuildRootCommandWithFs()` → `buildCheckCoverageCommand(fs)`; commands use `cmd.OutOrStdout()` for testable output.
 

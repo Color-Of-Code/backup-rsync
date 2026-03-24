@@ -81,8 +81,8 @@ func TestIntegration_Run_BasicSync(t *testing.T) {
 	writeFile(t, filepath.Join(src, "subdir", "nested.txt"), "nested content")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("basic", src+"/", dst+"/", testutil.Delete(false)).
+		AddMapping("m", src, dst).
+		AddJobToMapping("basic", "", "", testutil.Delete(false)).
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
@@ -103,8 +103,8 @@ func TestIntegration_Run_IdempotentSync(t *testing.T) {
 	writeFile(t, filepath.Join(src, "data.txt"), "same content")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("idem", src+"/", dst+"/").
+		AddMapping("m", src, dst).
+		AddJobToMapping("idem", "", "").
 		Build())
 
 	// First sync
@@ -129,8 +129,8 @@ func TestIntegration_Run_DeleteRemovesExtraFiles(t *testing.T) {
 	writeFile(t, filepath.Join(dst, "stale.txt"), "should be removed")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("cleanup", src+"/", dst+"/", testutil.Delete(true)).
+		AddMapping("m", src, dst).
+		AddJobToMapping("cleanup", "", "", testutil.Delete(true)).
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
@@ -151,8 +151,8 @@ func TestIntegration_Run_NoDeletePreservesExtraFiles(t *testing.T) {
 	writeFile(t, filepath.Join(dst, "extra.txt"), "should remain")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("nodelete", src+"/", dst+"/", testutil.Delete(false)).
+		AddMapping("m", src, dst).
+		AddJobToMapping("nodelete", "", "", testutil.Delete(false)).
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
@@ -174,8 +174,8 @@ func TestIntegration_Run_Exclusions(t *testing.T) {
 	writeFile(t, filepath.Join(src, "logs", "app.log"), "log data")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("filtered", src+"/", dst+"/", testutil.Exclusions("cache", "logs")).
+		AddMapping("m", src, dst).
+		AddJobToMapping("filtered", "", "", testutil.Exclusions("cache", "logs")).
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
@@ -196,8 +196,8 @@ func TestIntegration_Run_DisabledJobSkipped(t *testing.T) {
 	writeFile(t, filepath.Join(src, "file.txt"), "content")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("disabled-job", src+"/", dst+"/", testutil.Enabled(false)).
+		AddMapping("m", src, dst).
+		AddJobToMapping("disabled-job", "", "", testutil.Enabled(false)).
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
@@ -226,9 +226,10 @@ func TestIntegration_Run_MultipleJobs(t *testing.T) {
 	writeFile(t, filepath.Join(srcB, "b.txt"), "bravo")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(base).Target(base).
-		AddJob("jobA", srcA+"/", dstA+"/").
-		AddJob("jobB", srcB+"/", dstB+"/").
+		AddMapping("mA", srcA, dstA).
+		AddJobToMapping("jobA", "", "").
+		AddMapping("mB", srcB, dstB).
+		AddJobToMapping("jobB", "", "").
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
@@ -251,8 +252,8 @@ func TestIntegration_Run_PartialChanges(t *testing.T) {
 	writeFile(t, filepath.Join(src, "modified.txt"), "original")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("partial", src+"/", dst+"/").
+		AddMapping("m", src, dst).
+		AddJobToMapping("partial", "", "").
 		Build())
 
 	// Initial sync
@@ -282,8 +283,8 @@ func TestIntegration_Simulate_NoChanges(t *testing.T) {
 	writeFile(t, filepath.Join(src, "new.txt"), "should not appear in target")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("dryrun", src+"/", dst+"/").
+		AddMapping("m", src, dst).
+		AddJobToMapping("dryrun", "", "").
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "simulate", "--config", cfgPath)
@@ -305,8 +306,8 @@ func TestIntegration_Simulate_ShowsChanges(t *testing.T) {
 	writeFile(t, filepath.Join(src, "report.txt"), "quarterly report")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("preview", src+"/", dst+"/").
+		AddMapping("m", src, dst).
+		AddJobToMapping("preview", "", "").
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "simulate", "--config", cfgPath)
@@ -325,8 +326,8 @@ func TestIntegration_SimulateThenRun(t *testing.T) {
 	writeFile(t, filepath.Join(src, "data.txt"), "important data")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("workflow", src+"/", dst+"/").
+		AddMapping("m", src, dst).
+		AddJobToMapping("workflow", "", "").
 		Build())
 
 	// Simulate first
@@ -351,8 +352,8 @@ func TestIntegration_List_ShowsCommands(t *testing.T) {
 	writeFile(t, filepath.Join(src, "x.txt"), "x")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("listjob", src+"/", dst+"/", testutil.Exclusions("temp")).
+		AddMapping("m", src, dst).
+		AddJobToMapping("listjob", "", "", testutil.Exclusions("temp")).
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "list", "--config", cfgPath)
@@ -361,7 +362,7 @@ func TestIntegration_List_ShowsCommands(t *testing.T) {
 	assert.Contains(t, stdout, "Job: listjob")
 	assert.Contains(t, stdout, "--exclude=temp")
 	assert.Contains(t, stdout, src+"/")
-	assert.Contains(t, stdout, dst+"/")
+	assert.Contains(t, stdout, dst)
 	assert.NotContains(t, stdout, "Status [listjob]:")
 	assert.NotContains(t, stdout, "Summary:")
 
@@ -377,9 +378,9 @@ func TestIntegration_Run_VariableSubstitution(t *testing.T) {
 	writeFile(t, filepath.Join(src, "v.txt"), "vars work")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
 		Variable("src_dir", src).Variable("dst_dir", dst).
-		AddJob("var-job", "${src_dir}/", "${dst_dir}/").
+		AddMapping("m", "${src_dir}", "${dst_dir}").
+		AddJobToMapping("var-job", "", "").
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
@@ -408,9 +409,10 @@ func TestIntegration_Run_MixedJobsSummary(t *testing.T) {
 	writeFile(t, filepath.Join(srcSkip, "skip.txt"), "skip")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(base).Target(base).
-		AddJob("active", srcOK+"/", dstOK+"/", testutil.Enabled(true)).
-		AddJob("inactive", srcSkip+"/", dstSkip+"/", testutil.Enabled(false)).
+		AddMapping("mOK", srcOK, dstOK).
+		AddJobToMapping("active", "", "", testutil.Enabled(true)).
+		AddMapping("mSkip", srcSkip, dstSkip).
+		AddJobToMapping("inactive", "", "", testutil.Enabled(false)).
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
@@ -430,8 +432,8 @@ func TestIntegration_Run_EmptySource(t *testing.T) {
 	src, dst := setupDirs(t)
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("empty", src+"/", dst+"/").
+		AddMapping("m", src, dst).
+		AddJobToMapping("empty", "", "").
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
@@ -448,8 +450,8 @@ func TestIntegration_Run_DeepHierarchy(t *testing.T) {
 	writeFile(t, filepath.Join(src, "a", "b", "c", "d", "deep.txt"), "deep file")
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("deep", src+"/", dst+"/").
+		AddMapping("m", src, dst).
+		AddJobToMapping("deep", "", "").
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "run", "--config", cfgPath)
@@ -470,9 +472,9 @@ func TestIntegration_CheckCoverage_FullCoverage(t *testing.T) {
 	dst := t.TempDir()
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("docs", filepath.Join(src, "docs")+"/", filepath.Join(dst, "docs")+"/").
-		AddJob("photos", filepath.Join(src, "photos")+"/", filepath.Join(dst, "photos")+"/").
+		AddMapping("m", src, dst).
+		AddJobToMapping("docs", "docs", "docs").
+		AddJobToMapping("photos", "photos", "photos").
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "check-coverage", "--config", cfgPath)
@@ -496,8 +498,8 @@ func TestIntegration_CheckCoverage_IncompleteCoverage(t *testing.T) {
 	dst := t.TempDir()
 
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source(src).Target(dst).
-		AddJob("docs-only", filepath.Join(src, "docs")+"/", filepath.Join(dst, "docs")+"/").
+		AddMapping("m", src, dst).
+		AddJobToMapping("docs-only", "docs", "docs").
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "check-coverage", "--config", cfgPath)
@@ -511,15 +513,15 @@ func TestIntegration_CheckCoverage_IncompleteCoverage(t *testing.T) {
 
 func TestIntegration_ConfigShow(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/data").Target("/backup").
 		Variable("base", "/backup").
-		AddJob("resolved", "/data/files/", "${base}/files/").
+		AddMapping("m", "/data", "${base}").
+		AddJobToMapping("resolved", "files", "files").
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "config", "show", "--config", cfgPath)
 
 	require.NoError(t, err)
-	assert.Contains(t, stdout, "/backup/files/")
+	assert.Contains(t, stdout, "/backup/files")
 	assert.Contains(t, stdout, "resolved")
 }
 
@@ -527,8 +529,8 @@ func TestIntegration_ConfigShow(t *testing.T) {
 
 func TestIntegration_ConfigValidate_Valid(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/data").Target("/backup").
-		AddJob("valid", "/data/stuff/", "/backup/stuff/").
+		AddMapping("m", "/data", "/backup").
+		AddJobToMapping("valid", "stuff", "stuff").
 		Build())
 
 	stdout, err := executeIntegrationCommand(t, "config", "validate", "--config", cfgPath)
@@ -541,9 +543,9 @@ func TestIntegration_ConfigValidate_Valid(t *testing.T) {
 
 func TestIntegration_ConfigValidate_OverlappingSources(t *testing.T) {
 	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
-		Source("/data").Target("/backup").
-		AddJob("parent", "/data/user/", "/backup/user/").
-		AddJob("child", "/data/user/docs/", "/backup/docs/").
+		AddMapping("m", "/data", "/backup").
+		AddJobToMapping("parent", "user", "user").
+		AddJobToMapping("child", "user/docs", "docs").
 		Build())
 
 	_, err := executeIntegrationCommand(t, "config", "validate", "--config", cfgPath)

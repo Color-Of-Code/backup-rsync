@@ -19,11 +19,15 @@ func TestLoadConfig1(t *testing.T) {
 variables:
   target_base: "/mnt/backup1"
 
-jobs:
-  - name: "test_job"
-    source: "/home/test/"
-    target: "${target_base}/test/"
-    enabled: true
+mappings:
+  - name: "test"
+    source: "/home/test"
+    target: "${target_base}/test"
+    jobs:
+      - name: "test_job"
+        source: ""
+        target: ""
+        enabled: true
 `
 	reader := bytes.NewReader([]byte(yamlData))
 
@@ -31,25 +35,28 @@ jobs:
 	require.NoError(t, err)
 
 	assert.Equal(t, "/mnt/backup1", cfg.Variables["target_base"])
-	assert.Len(t, cfg.Jobs, 1)
+	assert.Len(t, cfg.Mappings, 1)
+	assert.Len(t, cfg.Mappings[0].Jobs, 1)
 
-	job := cfg.Jobs[0]
+	job := cfg.Mappings[0].Jobs[0]
 	assert.Equal(t, "test_job", job.Name)
-	assert.Equal(t, "/home/test/", job.Source)
-	assert.Equal(t, "${target_base}/test/", job.Target)
 }
 
 func TestLoadConfig2(t *testing.T) {
 	yamlData := `
-jobs:
-  - name: "job1"
-    source: "/source1"
-    target: "/target1"
-  - name: "job2"
-    source: "/source2"
-    target: "/target2"
-    delete: false
-    enabled: false
+mappings:
+  - name: "m1"
+    source: "/source"
+    target: "/target"
+    jobs:
+      - name: "job1"
+        source: "a"
+        target: "a"
+      - name: "job2"
+        source: "b"
+        target: "b"
+        delete: false
+        enabled: false
 `
 
 	reader := bytes.NewReader([]byte(yamlData))
@@ -57,26 +64,17 @@ jobs:
 	cfg, err := LoadConfig(reader)
 	require.NoError(t, err)
 
-	expected := []Job{
-		{
-			Name:    "job1",
-			Source:  "/source1",
-			Target:  "/target1",
-			Delete:  true,
-			Enabled: true,
-		},
-		{
-			Name:    "job2",
-			Source:  "/source2",
-			Target:  "/target2",
-			Delete:  false,
-			Enabled: false,
-		},
-	}
+	require.Len(t, cfg.Mappings, 1)
+	jobs := cfg.Mappings[0].Jobs
+	require.Len(t, jobs, 2)
 
-	for i, job := range cfg.Jobs {
-		assert.Equal(t, expected[i], job, "Job mismatch at index %d", i)
-	}
+	assert.Equal(t, "job1", jobs[0].Name)
+	assert.True(t, jobs[0].Delete)
+	assert.True(t, jobs[0].Enabled)
+
+	assert.Equal(t, "job2", jobs[1].Name)
+	assert.False(t, jobs[1].Delete)
+	assert.False(t, jobs[1].Enabled)
 }
 
 func TestYAMLUnmarshalingDefaults(t *testing.T) {
@@ -174,107 +172,13 @@ func TestValidateJobNames(t *testing.T) {
 	}
 }
 
-func TestValidatePath(t *testing.T) {
-	tests := []struct {
-		name     string
-		jobPath  string
-		paths    []Path
-		pathType string
-		wantErr  string
-	}{
-		{
-			name:     "ValidSourcePath",
-			jobPath:  "/home/user/documents",
-			paths:    []Path{{Path: "/home/user"}},
-			pathType: "source",
-		},
-		{
-			name:     "InvalidSourcePath",
-			jobPath:  "/invalid/source",
-			paths:    []Path{{Path: "/home/user"}},
-			pathType: "source",
-			wantErr:  "invalid path for job 'job1': source /invalid/source",
-		},
-		{
-			name:     "ValidTargetPath",
-			jobPath:  "/mnt/backup/documents",
-			paths:    []Path{{Path: "/mnt/backup"}},
-			pathType: "target",
-		},
-		{
-			name:     "InvalidTargetPath",
-			jobPath:  "/invalid/target",
-			paths:    []Path{{Path: "/mnt/backup"}},
-			pathType: "target",
-			wantErr:  "invalid path for job 'job1': target /invalid/target",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := ValidatePath(test.jobPath, test.paths, test.pathType, "job1")
-
-			if test.wantErr != "" {
-				require.Error(t, err)
-				assert.EqualError(t, err, test.wantErr)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestValidatePaths(t *testing.T) {
-	tests := []struct {
-		name    string
-		cfg     Config
-		wantErr string
-	}{
-		{
-			name: "ValidPaths",
-			cfg: Config{
-				Sources: []Path{{Path: "/home/user"}},
-				Targets: []Path{{Path: "/mnt/backup"}},
-				Jobs:    []Job{{Name: "job1", Source: "/home/user/documents", Target: "/mnt/backup/documents"}},
-			},
-		},
-		{
-			name: "InvalidPaths",
-			cfg: Config{
-				Sources: []Path{{Path: "/home/user"}},
-				Targets: []Path{{Path: "/mnt/backup"}},
-				Jobs:    []Job{{Name: "job1", Source: "/invalid/source", Target: "/invalid/target"}},
-			},
-			wantErr: "path validation failed",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := ValidatePaths(test.cfg)
-
-			if test.wantErr != "" {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), test.wantErr)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
 func TestConfigString_ValidConfig(t *testing.T) {
 	cfg := Config{
-		Sources:   []Path{},
-		Targets:   []Path{},
-		Variables: map[string]string{},
-		Jobs:      []Job{},
+		Mappings: []Mapping{},
 	}
 
-	expectedOutput := "sources: []\ntargets: []\nvariables: {}\njobs: []\n"
 	actualOutput := cfg.String()
-
-	assert.Equal(t, expectedOutput, actualOutput)
+	assert.Contains(t, actualOutput, "mappings: []")
 }
 
 func TestResolveConfig(t *testing.T) {
@@ -283,16 +187,15 @@ func TestResolveConfig(t *testing.T) {
 			"source_base": "/home/user",
 			"target_base": "/backup/user",
 		},
-		Jobs: []Job{
+		Mappings: []Mapping{
 			{
-				Name:   "job1",
-				Source: "${source_base}/Documents",
-				Target: "${target_base}/Documents",
-			},
-			{
-				Name:   "job2",
-				Source: "${source_base}/Pictures",
-				Target: "${target_base}/Pictures",
+				Name:   "data",
+				Source: "${source_base}",
+				Target: "${target_base}",
+				Jobs: []Job{
+					{Name: "job1", Source: "Documents", Target: "Documents", Enabled: true, Delete: true},
+					{Name: "job2", Source: "Pictures", Target: "Pictures", Enabled: true, Delete: true},
+				},
 			},
 		},
 	}
@@ -300,10 +203,11 @@ func TestResolveConfig(t *testing.T) {
 	resolvedCfg, err := ResolveConfig(cfg)
 	require.NoError(t, err)
 
-	assert.Equal(t, "/home/user/Documents", resolvedCfg.Jobs[0].Source)
-	assert.Equal(t, "/backup/user/Documents", resolvedCfg.Jobs[0].Target)
-	assert.Equal(t, "/home/user/Pictures", resolvedCfg.Jobs[1].Source)
-	assert.Equal(t, "/backup/user/Pictures", resolvedCfg.Jobs[1].Target)
+	allJobs := resolvedCfg.AllJobs()
+	assert.Equal(t, "/home/user/Documents/", allJobs[0].Source)
+	assert.Equal(t, "/backup/user/Documents", allJobs[0].Target)
+	assert.Equal(t, "/home/user/Pictures/", allJobs[1].Source)
+	assert.Equal(t, "/backup/user/Pictures", allJobs[1].Target)
 }
 
 func TestLoadResolvedConfig(t *testing.T) {
@@ -314,26 +218,29 @@ func TestLoadResolvedConfig(t *testing.T) {
 		{name: "FileNotFound", wantErr: "failed to open config"},
 		{name: "InvalidYAML", config: "{{invalid yaml", wantErr: "failed to parse YAML"},
 		{name: "DuplicateJobNames", wantErr: "duplicate job name: dup",
-			config: testutil.NewConfigBuilder().Source("/src").Target("/tgt").
-				AddJob("dup", "/src/a", "/tgt/a").AddJob("dup", "/src/b", "/tgt/b").Build()},
-		{name: "InvalidSourcePath", wantErr: "path validation failed",
-			config: testutil.NewConfigBuilder().Source("/home").Target("/backup").
-				AddJob("job1", "/invalid/source", "/backup/stuff").Build()},
+			config: testutil.NewConfigBuilder().
+				AddMapping("m", "/src", "/tgt").
+				AddJobToMapping("dup", "a", "a").AddJobToMapping("dup", "b", "b").Build()},
 		{name: "OverlappingSourcePaths", wantErr: "job source path validation failed",
-			config: testutil.NewConfigBuilder().Source("/home").Target("/backup").
-				AddJob("parent", "/home/user", "/backup/user").
-				AddJob("child", "/home/user/docs", "/backup/docs").Build()},
+			config: testutil.NewConfigBuilder().
+				AddMapping("m", "/home", "/backup").
+				AddJobToMapping("parent", "user", "user").
+				AddJobToMapping("child", "user/docs", "docs").Build()},
 		{name: "OverlappingAllowedByExclusion", wantJobs: 2,
-			config: testutil.NewConfigBuilder().Source("/home").Target("/backup").
-				AddJob("parent", "/home/user", "/backup/user", testutil.Exclusions("docs")).
-				AddJob("child", "/home/user/docs", "/backup/docs").Build()},
+			config: testutil.NewConfigBuilder().
+				AddMapping("m", "/home", "/backup").
+				AddJobToMapping("parent", "user", "user", testutil.Exclusions("docs")).
+				AddJobToMapping("child", "user/docs", "docs").Build()},
 		{name: "OverlappingTargetPaths", wantErr: "job target path validation failed",
-			config: testutil.NewConfigBuilder().Source("/home").Target("/backup").
-				AddJob("job1", "/home/docs", "/backup/all").
-				AddJob("job2", "/home/photos", "/backup/all/photos").Build()},
+			config: testutil.NewConfigBuilder().
+				AddMapping("m", "/home", "/backup").
+				AddJobToMapping("job1", "docs", "all").
+				AddJobToMapping("job2", "photos", "all/photos").Build()},
 		{name: "ValidConfig", wantJobs: 1, wantTarget: "/backup/docs",
-			config: testutil.NewConfigBuilder().Source("/home").Target("/backup").
-				Variable("base", "/backup").AddJob("docs", "/home/docs", "${base}/docs").Build()},
+			config: testutil.NewConfigBuilder().
+				Variable("base", "/backup").
+				AddMapping("m", "/home", "${base}").
+				AddJobToMapping("docs", "docs", "docs").Build()},
 	}
 
 	for _, test := range tests {
@@ -344,7 +251,6 @@ func TestLoadResolvedConfig(t *testing.T) {
 			}
 
 			cfg, err := LoadResolvedConfig(path)
-
 			if test.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), test.wantErr)
@@ -354,12 +260,13 @@ func TestLoadResolvedConfig(t *testing.T) {
 
 			require.NoError(t, err)
 
+			allJobs := cfg.AllJobs()
 			if test.wantJobs > 0 {
-				assert.Len(t, cfg.Jobs, test.wantJobs)
+				assert.Len(t, allJobs, test.wantJobs)
 			}
 
 			if test.wantTarget != "" {
-				assert.Equal(t, test.wantTarget, cfg.Jobs[0].Target)
+				assert.Equal(t, test.wantTarget, allJobs[0].Target)
 			}
 		})
 	}
@@ -373,9 +280,16 @@ func TestConfigApply_VersionInfoSuccess(t *testing.T) {
 	logger := log.New(&logBuf, "", 0)
 
 	cfg := Config{
-		Jobs: []Job{
-			{Name: "job1", Source: "/src/", Target: "/dst/", Enabled: true},
-			{Name: "job2", Source: "/src2/", Target: "/dst2/", Enabled: false},
+		Mappings: []Mapping{
+			{
+				Name:   "test",
+				Source: "/src",
+				Target: "/dst",
+				Jobs: []Job{
+					{Name: "job1", Source: "/src/a/", Target: "/dst/a", Enabled: true},
+					{Name: "job2", Source: "/src/b/", Target: "/dst/b", Enabled: false},
+				},
+			},
 		},
 	}
 
@@ -400,8 +314,15 @@ func TestConfigApply_VersionInfoError(t *testing.T) {
 	logger := log.New(&logBuf, "", 0)
 
 	cfg := Config{
-		Jobs: []Job{
-			{Name: "backup", Source: "/data/", Target: "/bak/", Enabled: true},
+		Mappings: []Mapping{
+			{
+				Name:   "test",
+				Source: "/data",
+				Target: "/bak",
+				Jobs: []Job{
+					{Name: "backup", Source: "/data/stuff/", Target: "/bak/stuff", Enabled: true},
+				},
+			},
 		},
 	}
 
@@ -471,16 +392,20 @@ func TestResolveVariables_CircularReference(t *testing.T) {
 func TestResolveConfig_ResolvesAllFields(t *testing.T) {
 	cfg := Config{
 		Variables: map[string]string{
-			"user":     "alice",
-			"user_cap": "Jaap",
+			"user": "alice",
 		},
-		Sources: []Path{{Path: "/home/${user}/"}},
-		Targets: []Path{{Path: "/mnt/backup1/${user}"}},
-		Jobs: []Job{
+		Mappings: []Mapping{
 			{
-				Name:   "${user}_docs",
-				Source: "/home/${user}/Documents/",
-				Target: "/mnt/backup1/${user}/documents",
+				Name:   "${user}_home",
+				Source: "/home/${user}",
+				Target: "/mnt/backup1/${user}",
+				Jobs: []Job{
+					{
+						Name:   "${user}_docs",
+						Source: "Documents",
+						Target: "documents",
+					},
+				},
 			},
 		},
 	}
@@ -488,11 +413,14 @@ func TestResolveConfig_ResolvesAllFields(t *testing.T) {
 	resolved, err := ResolveConfig(cfg)
 
 	require.NoError(t, err)
-	assert.Equal(t, "/home/alice/", resolved.Sources[0].Path)
-	assert.Equal(t, "/mnt/backup1/alice", resolved.Targets[0].Path)
-	assert.Equal(t, "alice_docs", resolved.Jobs[0].Name)
-	assert.Equal(t, "/home/alice/Documents/", resolved.Jobs[0].Source)
-	assert.Equal(t, "/mnt/backup1/alice/documents", resolved.Jobs[0].Target)
+	assert.Equal(t, "alice_home", resolved.Mappings[0].Name)
+	assert.Equal(t, "/home/alice", resolved.Mappings[0].Source)
+	assert.Equal(t, "/mnt/backup1/alice", resolved.Mappings[0].Target)
+
+	allJobs := resolved.AllJobs()
+	assert.Equal(t, "alice_docs", allJobs[0].Name)
+	assert.Equal(t, "/home/alice/Documents/", allJobs[0].Source)
+	assert.Equal(t, "/mnt/backup1/alice/documents", allJobs[0].Target)
 }
 
 func TestResolveConfig_VariableChaining(t *testing.T) {
@@ -502,13 +430,18 @@ func TestResolveConfig_VariableChaining(t *testing.T) {
 			"source_home": "/home/${user}",
 			"target_base": "/mnt/backup1/${user}",
 		},
-		Sources: []Path{{Path: "/home/${user}/"}},
-		Targets: []Path{{Path: "/mnt/backup1/${user}"}},
-		Jobs: []Job{
+		Mappings: []Mapping{
 			{
-				Name:   "${user}_mail",
-				Source: "${source_home}/.thunderbird/",
-				Target: "${target_base}/mail",
+				Name:   "${user}_home",
+				Source: "${source_home}",
+				Target: "${target_base}",
+				Jobs: []Job{
+					{
+						Name:   "${user}_mail",
+						Source: ".thunderbird",
+						Target: "mail",
+					},
+				},
 			},
 		},
 	}
@@ -516,41 +449,71 @@ func TestResolveConfig_VariableChaining(t *testing.T) {
 	resolved, err := ResolveConfig(cfg)
 
 	require.NoError(t, err)
-	assert.Equal(t, "/home/bob/", resolved.Sources[0].Path)
-	assert.Equal(t, "/mnt/backup1/bob", resolved.Targets[0].Path)
-	assert.Equal(t, "bob_mail", resolved.Jobs[0].Name)
-	assert.Equal(t, "/home/bob/.thunderbird/", resolved.Jobs[0].Source)
-	assert.Equal(t, "/mnt/backup1/bob/mail", resolved.Jobs[0].Target)
+	assert.Equal(t, "/home/bob", resolved.Mappings[0].Source)
+	assert.Equal(t, "/mnt/backup1/bob", resolved.Mappings[0].Target)
+
+	allJobs := resolved.AllJobs()
+	assert.Equal(t, "bob_mail", allJobs[0].Name)
+	assert.Equal(t, "/home/bob/.thunderbird/", allJobs[0].Source)
+	assert.Equal(t, "/mnt/backup1/bob/mail", allJobs[0].Target)
 }
 
-func TestResolveConfig_SourceMacroError(t *testing.T) {
+func TestResolveConfig_MappingSourceMacroError(t *testing.T) {
 	cfg := Config{
-		Sources: []Path{{Path: "/home/@{bogus:val}/"}},
-		Jobs:    []Job{{Name: "job1", Source: "/src/", Target: "/dst/"}},
+		Mappings: []Mapping{
+			{
+				Name:   "test",
+				Source: "/home/@{bogus:val}",
+				Target: "/dst",
+				Jobs:   []Job{{Name: "job1", Source: "a", Target: "a"}},
+			},
+		},
 	}
 
 	_, err := ResolveConfig(cfg)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "resolving source path")
+	assert.Contains(t, err.Error(), "resolving mapping source")
 }
 
-func TestResolveConfig_TargetMacroError(t *testing.T) {
+func TestResolveConfig_MappingTargetMacroError(t *testing.T) {
 	cfg := Config{
-		Targets: []Path{{Path: "/backup/@{bogus:val}/"}},
-		Jobs:    []Job{{Name: "job1", Source: "/src/", Target: "/dst/"}},
+		Mappings: []Mapping{
+			{
+				Name:   "test",
+				Source: "/src",
+				Target: "/backup/@{bogus:val}",
+				Jobs:   []Job{{Name: "job1", Source: "a", Target: "a"}},
+			},
+		},
 	}
 
 	_, err := ResolveConfig(cfg)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "resolving target path")
+	assert.Contains(t, err.Error(), "resolving mapping target")
+}
+
+func TestResolveConfig_MappingNameMacroError(t *testing.T) {
+	cfg := Config{
+		Mappings: []Mapping{
+			{
+				Name:   "@{bogus:val}",
+				Source: "/src",
+				Target: "/dst",
+				Jobs:   []Job{{Name: "job1", Source: "a", Target: "a"}},
+			},
+		},
+	}
+
+	_, err := ResolveConfig(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "resolving mapping name")
 }
 
 func TestLoadResolvedConfig_WithOverrides(t *testing.T) {
 	config := testutil.NewConfigBuilder().
-		Source("/home/${user}").
-		Target("/mnt/backup1/${user}").
 		Variable("user", "default").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/mnt/backup1/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/mnt/backup1/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build()
 
 	path := testutil.WriteConfigFile(t, config)
@@ -558,16 +521,17 @@ func TestLoadResolvedConfig_WithOverrides(t *testing.T) {
 	cfg, err := LoadResolvedConfig(path, map[string]string{"user": "alice"})
 
 	require.NoError(t, err)
-	assert.Equal(t, "alice_docs", cfg.Jobs[0].Name)
-	assert.Equal(t, "/home/alice/docs/", cfg.Jobs[0].Source)
-	assert.Equal(t, "/mnt/backup1/alice/docs/", cfg.Jobs[0].Target)
+
+	allJobs := cfg.AllJobs()
+	assert.Equal(t, "alice_docs", allJobs[0].Name)
+	assert.Equal(t, "/home/alice/docs/", allJobs[0].Source)
+	assert.Equal(t, "/mnt/backup1/alice/docs", allJobs[0].Target)
 }
 
 func TestLoadResolvedConfig_OverridesNewVariable(t *testing.T) {
 	config := testutil.NewConfigBuilder().
-		Source("/home/${user}").
-		Target("/mnt/backup1/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/mnt/backup1/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/mnt/backup1/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build()
 
 	path := testutil.WriteConfigFile(t, config)
@@ -575,9 +539,11 @@ func TestLoadResolvedConfig_OverridesNewVariable(t *testing.T) {
 	cfg, err := LoadResolvedConfig(path, map[string]string{"user": "bob"})
 
 	require.NoError(t, err)
-	assert.Equal(t, "bob_docs", cfg.Jobs[0].Name)
-	assert.Equal(t, "/home/bob/docs/", cfg.Jobs[0].Source)
-	assert.Equal(t, "/mnt/backup1/bob/docs/", cfg.Jobs[0].Target)
+
+	allJobs := cfg.AllJobs()
+	assert.Equal(t, "bob_docs", allJobs[0].Name)
+	assert.Equal(t, "/home/bob/docs/", allJobs[0].Source)
+	assert.Equal(t, "/mnt/backup1/bob/docs", allJobs[0].Target)
 }
 
 // --- ValidateTemplateVars ---
@@ -648,9 +614,9 @@ func TestValidateTemplateVars(t *testing.T) {
 func TestLoadResolvedConfig_TemplateVarsMissing(t *testing.T) {
 	config := testutil.NewConfigBuilder().
 		TemplateVar("user").TemplateVar("user_cap").
-		Source("/home/${user}").Target("/backup/${user}").
 		Variable("user", "alice").
-		AddJob("docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("docs", "docs", "docs").
 		Build()
 
 	path := testutil.WriteConfigFile(t, config)
@@ -665,8 +631,8 @@ func TestLoadResolvedConfig_TemplateVarsMissing(t *testing.T) {
 func TestLoadResolvedConfig_TemplateVarsProvidedViaOverride(t *testing.T) {
 	config := testutil.NewConfigBuilder().
 		TemplateVar("user").TemplateVar("user_cap").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build()
 
 	path := testutil.WriteConfigFile(t, config)
@@ -674,15 +640,15 @@ func TestLoadResolvedConfig_TemplateVarsProvidedViaOverride(t *testing.T) {
 	cfg, err := LoadResolvedConfig(path, map[string]string{"user": "alice", "user_cap": "Alice"})
 
 	require.NoError(t, err)
-	assert.Equal(t, "alice_docs", cfg.Jobs[0].Name)
+	assert.Equal(t, "alice_docs", cfg.AllJobs()[0].Name)
 }
 
 func TestLoadResolvedConfig_TemplateVarsAllInYAML(t *testing.T) {
 	config := testutil.NewConfigBuilder().
 		TemplateVar("user").
-		Source("/home/${user}").Target("/backup/${user}").
 		Variable("user", "bob").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build()
 
 	path := testutil.WriteConfigFile(t, config)
@@ -690,7 +656,7 @@ func TestLoadResolvedConfig_TemplateVarsAllInYAML(t *testing.T) {
 	cfg, err := LoadResolvedConfig(path)
 
 	require.NoError(t, err)
-	assert.Equal(t, "bob_docs", cfg.Jobs[0].Name)
+	assert.Equal(t, "bob_docs", cfg.AllJobs()[0].Name)
 }
 
 // --- LoadResolvedConfig with include ---
@@ -700,8 +666,8 @@ func TestLoadResolvedConfig_BasicInclude(t *testing.T) {
 
 	template := testutil.NewConfigBuilder().
 		TemplateVar("user").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build()
 	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
 
@@ -713,10 +679,12 @@ func TestLoadResolvedConfig_BasicInclude(t *testing.T) {
 	cfg, err := LoadResolvedConfig(mainPath)
 
 	require.NoError(t, err)
-	require.Len(t, cfg.Jobs, 1)
-	assert.Equal(t, "alice_docs", cfg.Jobs[0].Name)
-	assert.Equal(t, "/home/alice/docs/", cfg.Jobs[0].Source)
-	assert.Equal(t, "/backup/alice/docs/", cfg.Jobs[0].Target)
+
+	allJobs := cfg.AllJobs()
+	require.Len(t, allJobs, 1)
+	assert.Equal(t, "alice_docs", allJobs[0].Name)
+	assert.Equal(t, "/home/alice/docs/", allJobs[0].Source)
+	assert.Equal(t, "/backup/alice/docs", allJobs[0].Target)
 }
 
 func TestLoadResolvedConfig_MultipleIncludes(t *testing.T) {
@@ -724,8 +692,8 @@ func TestLoadResolvedConfig_MultipleIncludes(t *testing.T) {
 
 	template := testutil.NewConfigBuilder().
 		TemplateVar("user").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build()
 	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
 
@@ -738,9 +706,11 @@ func TestLoadResolvedConfig_MultipleIncludes(t *testing.T) {
 	cfg, err := LoadResolvedConfig(mainPath)
 
 	require.NoError(t, err)
-	require.Len(t, cfg.Jobs, 2)
-	assert.Equal(t, "alice_docs", cfg.Jobs[0].Name)
-	assert.Equal(t, "bob_docs", cfg.Jobs[1].Name)
+
+	allJobs := cfg.AllJobs()
+	require.Len(t, allJobs, 2)
+	assert.Equal(t, "alice_docs", allJobs[0].Name)
+	assert.Equal(t, "bob_docs", allJobs[1].Name)
 }
 
 func TestLoadResolvedConfig_IncludeMissingTemplateVars(t *testing.T) {
@@ -748,8 +718,8 @@ func TestLoadResolvedConfig_IncludeMissingTemplateVars(t *testing.T) {
 
 	template := testutil.NewConfigBuilder().
 		TemplateVar("user").TemplateVar("user_cap").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build()
 	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
 
@@ -788,8 +758,8 @@ func TestLoadResolvedConfig_NestedIncludesRejected(t *testing.T) {
 	// inner template itself has an include (nested)
 	inner := testutil.NewConfigBuilder().
 		AddInclude("other.yaml", map[string]string{"x": "y"}).
-		Source("/src").Target("/dst").
-		AddJob("inner", "/src/a/", "/dst/a/").
+		AddMapping("m", "/src", "/dst").
+		AddJobToMapping("inner", "a", "a").
 		Build()
 	testutil.WriteConfigFileInDir(t, dir, "inner.yaml", inner)
 
@@ -827,9 +797,9 @@ func TestLoadResolvedConfig_IncludeWithVariableChaining(t *testing.T) {
 
 	template := testutil.NewConfigBuilder().
 		TemplateVar("user").
-		Source("/home/${user}").Target("/backup/${user}").
 		Variable("home", "/home/${user}").
-		AddJob("${user}_mail", "${home}/.thunderbird/", "/backup/${user}/mail").
+		AddMapping("home", "${home}", "/backup/${user}").
+		AddJobToMapping("${user}_mail", ".thunderbird", "mail").
 		Build()
 	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
 
@@ -841,10 +811,12 @@ func TestLoadResolvedConfig_IncludeWithVariableChaining(t *testing.T) {
 	cfg, err := LoadResolvedConfig(mainPath)
 
 	require.NoError(t, err)
-	require.Len(t, cfg.Jobs, 1)
-	assert.Equal(t, "alice_mail", cfg.Jobs[0].Name)
-	assert.Equal(t, "/home/alice/.thunderbird/", cfg.Jobs[0].Source)
-	assert.Equal(t, "/backup/alice/mail", cfg.Jobs[0].Target)
+
+	allJobs := cfg.AllJobs()
+	require.Len(t, allJobs, 1)
+	assert.Equal(t, "alice_mail", allJobs[0].Name)
+	assert.Equal(t, "/home/alice/.thunderbird/", allJobs[0].Source)
+	assert.Equal(t, "/backup/alice/mail", allJobs[0].Target)
 }
 
 func TestLoadResolvedConfig_IncludeWithOverridesOnMainConfig(t *testing.T) {
@@ -852,9 +824,9 @@ func TestLoadResolvedConfig_IncludeWithOverridesOnMainConfig(t *testing.T) {
 
 	template := testutil.NewConfigBuilder().
 		TemplateVar("user").
-		Source("/home/${user}").Target("/${target_root}/${user}").
 		Variable("target_root", "backup").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/${target_root}/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/${target_root}/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build()
 	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
 
@@ -866,34 +838,35 @@ func TestLoadResolvedConfig_IncludeWithOverridesOnMainConfig(t *testing.T) {
 	cfg, err := LoadResolvedConfig(mainPath)
 
 	require.NoError(t, err)
-	assert.Equal(t, "/backup/alice/docs/", cfg.Jobs[0].Target)
+	assert.Equal(t, "/backup/alice/docs", cfg.AllJobs()[0].Target)
 }
 
-func TestLoadResolvedConfig_IncludeMergesSources(t *testing.T) {
+func TestLoadResolvedConfig_IncludeMergesMappings(t *testing.T) {
 	dir := t.TempDir()
 
 	template := testutil.NewConfigBuilder().
 		TemplateVar("user").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
 		Build()
 	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
 
 	main := testutil.NewConfigBuilder().
-		Source("/shared").Target("/shared-backup").
+		AddMapping("shared", "/shared", "/shared-backup").
+		AddJobToMapping("shared_data", "data", "data").
 		AddInclude("template.yaml", map[string]string{"user": "alice"}).
-		AddJob("shared_data", "/shared/data/", "/shared-backup/data/").
 		Build()
 	mainPath := testutil.WriteConfigFileInDir(t, dir, "main.yaml", main)
 
 	cfg, err := LoadResolvedConfig(mainPath)
 
 	require.NoError(t, err)
-	require.Len(t, cfg.Jobs, 2)
 
-	// Main config's own sources + included template's sources
-	assert.Len(t, cfg.Sources, 2)
-	assert.Len(t, cfg.Targets, 2)
+	allJobs := cfg.AllJobs()
+	require.Len(t, allJobs, 2)
+
+	// Main config's own mappings + included template's mappings
+	assert.Len(t, cfg.Mappings, 2)
 }
 
 func TestLoadResolvedConfig_IncludeMacroError(t *testing.T) {
@@ -901,8 +874,8 @@ func TestLoadResolvedConfig_IncludeMacroError(t *testing.T) {
 
 	template := testutil.NewConfigBuilder().
 		TemplateVar("user").
-		Source("/home/${user}").Target("/backup/${user}").
-		AddJob("${user}_docs", "/home/@{bogus:val}/", "/backup/${user}/docs/").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "@{bogus:val}", "docs").
 		Build()
 	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
 
@@ -915,4 +888,179 @@ func TestLoadResolvedConfig_IncludeMacroError(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "expanding includes")
+}
+
+func TestLoadResolvedConfig_IncludeTemplateMappingSourceMacroError(t *testing.T) {
+	dir := t.TempDir()
+
+	template := testutil.NewConfigBuilder().
+		TemplateVar("user").
+		AddMapping("home", "@{bogus:val}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
+		Build()
+	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
+
+	main := testutil.NewConfigBuilder().
+		AddInclude("template.yaml", map[string]string{"user": "alice"}).
+		Build()
+	mainPath := testutil.WriteConfigFileInDir(t, dir, "main.yaml", main)
+
+	_, err := LoadResolvedConfig(mainPath)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expanding includes")
+}
+
+func TestLoadResolvedConfig_IncludeTemplateMappingTargetMacroError(t *testing.T) {
+	dir := t.TempDir()
+
+	template := testutil.NewConfigBuilder().
+		TemplateVar("user").
+		AddMapping("home", "/home/${user}", "@{bogus:val}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
+		Build()
+	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
+
+	main := testutil.NewConfigBuilder().
+		AddInclude("template.yaml", map[string]string{"user": "alice"}).
+		Build()
+	mainPath := testutil.WriteConfigFileInDir(t, dir, "main.yaml", main)
+
+	_, err := LoadResolvedConfig(mainPath)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expanding includes")
+}
+
+func TestLoadResolvedConfig_IncludeTemplateMappingNameMacroError(t *testing.T) {
+	dir := t.TempDir()
+
+	template := testutil.NewConfigBuilder().
+		TemplateVar("user").
+		AddMapping("@{bogus:val}", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "docs").
+		Build()
+	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
+
+	main := testutil.NewConfigBuilder().
+		AddInclude("template.yaml", map[string]string{"user": "alice"}).
+		Build()
+	mainPath := testutil.WriteConfigFileInDir(t, dir, "main.yaml", main)
+
+	_, err := LoadResolvedConfig(mainPath)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expanding includes")
+}
+
+func TestConfigBuilder_AddMappingWithExclusions(t *testing.T) {
+	yaml := testutil.NewConfigBuilder().
+		AddMappingWithExclusions("m", "/src", "/tgt", "cache", "tmp").
+		AddJobToMapping("j", "docs", "docs").
+		Build()
+
+	assert.Contains(t, yaml, "exclusions:")
+	assert.Contains(t, yaml, "cache")
+	assert.Contains(t, yaml, "tmp")
+}
+
+func TestLoadResolvedConfig_IncludeTemplateJobNameMacroError(t *testing.T) {
+	dir := t.TempDir()
+
+	template := testutil.NewConfigBuilder().
+		TemplateVar("user").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("@{bogus:val}", "docs", "docs").
+		Build()
+	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
+
+	main := testutil.NewConfigBuilder().
+		AddInclude("template.yaml", map[string]string{"user": "alice"}).
+		Build()
+	mainPath := testutil.WriteConfigFileInDir(t, dir, "main.yaml", main)
+
+	_, err := LoadResolvedConfig(mainPath)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expanding includes")
+}
+
+func TestLoadResolvedConfig_IncludeTemplateJobTargetMacroError(t *testing.T) {
+	dir := t.TempDir()
+
+	template := testutil.NewConfigBuilder().
+		TemplateVar("user").
+		AddMapping("home", "/home/${user}", "/backup/${user}").
+		AddJobToMapping("${user}_docs", "docs", "@{bogus:val}").
+		Build()
+	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
+
+	main := testutil.NewConfigBuilder().
+		AddInclude("template.yaml", map[string]string{"user": "alice"}).
+		Build()
+	mainPath := testutil.WriteConfigFileInDir(t, dir, "main.yaml", main)
+
+	_, err := LoadResolvedConfig(mainPath)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expanding includes")
+}
+
+func TestResolveConfig_JobNameMacroError(t *testing.T) {
+	cfg := Config{
+		Mappings: []Mapping{{Name: "m", Source: "/src", Target: "/tgt",
+			Jobs: []Job{{Name: "@{bogus:val}", Source: "", Target: ""}}}},
+	}
+
+	_, err := ResolveConfig(cfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "resolving job")
+}
+
+// --- AllJobs, AllSources, AllTargets helpers ---
+
+func TestAllJobs(t *testing.T) {
+	cfg := Config{
+		Mappings: []Mapping{
+			{Name: "m1", Source: "/s1", Target: "/t1", Jobs: []Job{{Name: "j1"}, {Name: "j2"}}},
+			{Name: "m2", Source: "/s2", Target: "/t2", Jobs: []Job{{Name: "j3"}}},
+		},
+	}
+
+	allJobs := cfg.AllJobs()
+	require.Len(t, allJobs, 3)
+	assert.Equal(t, "j1", allJobs[0].Name)
+	assert.Equal(t, "j2", allJobs[1].Name)
+	assert.Equal(t, "j3", allJobs[2].Name)
+}
+
+func TestAllSources(t *testing.T) {
+	cfg := Config{
+		Mappings: []Mapping{
+			{Name: "m1", Source: "/s1", Target: "/t1", Exclusions: []string{"cache"}},
+			{Name: "m2", Source: "/s2", Target: "/t2"},
+		},
+	}
+
+	sources := cfg.AllSources()
+	require.Len(t, sources, 2)
+	assert.Equal(t, "/s1", sources[0].Path)
+	assert.Equal(t, []string{"cache"}, sources[0].Exclusions)
+	assert.Equal(t, "/s2", sources[1].Path)
+}
+
+func TestAllTargets(t *testing.T) {
+	cfg := Config{
+		Mappings: []Mapping{
+			{Name: "m1", Source: "/s1", Target: "/t1"},
+			{Name: "m2", Source: "/s2", Target: "/t1"}, // duplicate target
+			{Name: "m3", Source: "/s3", Target: "/t2"},
+		},
+	}
+
+	targets := cfg.AllTargets()
+	require.Len(t, targets, 2)
+	assert.Equal(t, "/t1", targets[0].Path)
+	assert.Equal(t, "/t2", targets[1].Path)
 }

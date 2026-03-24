@@ -17,6 +17,14 @@ type jobDef struct {
 	exclusions []string
 }
 
+type mappingDef struct {
+	name       string
+	source     string
+	target     string
+	exclusions []string
+	jobs       []jobDef
+}
+
 type includeDef struct {
 	uses string
 	with map[string]string
@@ -24,10 +32,8 @@ type includeDef struct {
 
 // ConfigBuilder constructs YAML config strings declaratively.
 type ConfigBuilder struct {
-	sources      []string
-	targets      []string
+	mappings     []mappingDef
 	variables    map[string]string
-	jobs         []jobDef
 	templateVars []string
 	includes     []includeDef
 }
@@ -39,16 +45,33 @@ func NewConfigBuilder() *ConfigBuilder {
 	}
 }
 
-// Source adds a source path.
-func (b *ConfigBuilder) Source(path string) *ConfigBuilder {
-	b.sources = append(b.sources, path)
+// AddMapping adds a mapping with the given name, source, and target paths.
+func (b *ConfigBuilder) AddMapping(name, source, target string) *ConfigBuilder {
+	b.mappings = append(b.mappings, mappingDef{name: name, source: source, target: target})
 
 	return b
 }
 
-// Target adds a target path.
-func (b *ConfigBuilder) Target(path string) *ConfigBuilder {
-	b.targets = append(b.targets, path)
+// AddMappingWithExclusions adds a mapping with exclusions.
+func (b *ConfigBuilder) AddMappingWithExclusions(name, source, target string, exclusions ...string) *ConfigBuilder {
+	b.mappings = append(b.mappings, mappingDef{name: name, source: source, target: target, exclusions: exclusions})
+
+	return b
+}
+
+// AddJobToMapping adds a job to the last mapping.
+func (b *ConfigBuilder) AddJobToMapping(name, source, target string, opts ...JobOpt) *ConfigBuilder {
+	if len(b.mappings) == 0 {
+		panic("AddJobToMapping called with no mappings")
+	}
+
+	job := jobDef{name: name, source: source, target: target}
+	for _, opt := range opts {
+		opt(&job)
+	}
+
+	lastMapping := &b.mappings[len(b.mappings)-1]
+	lastMapping.jobs = append(lastMapping.jobs, job)
 
 	return b
 }
@@ -56,18 +79,6 @@ func (b *ConfigBuilder) Target(path string) *ConfigBuilder {
 // Variable adds a variable for substitution.
 func (b *ConfigBuilder) Variable(key, value string) *ConfigBuilder {
 	b.variables[key] = value
-
-	return b
-}
-
-// AddJob adds a job with the given name, source, and target paths.
-func (b *ConfigBuilder) AddJob(name, source, target string, opts ...JobOpt) *ConfigBuilder {
-	j := jobDef{name: name, source: source, target: target}
-	for _, opt := range opts {
-		opt(&j)
-	}
-
-	b.jobs = append(b.jobs, j)
 
 	return b
 }
@@ -93,18 +104,6 @@ func (b *ConfigBuilder) Build() string {
 	b.writeTemplate(&result)
 	b.writeIncludes(&result)
 
-	result.WriteString("sources:\n")
-
-	for _, s := range b.sources {
-		fmt.Fprintf(&result, "  - path: %q\n", s)
-	}
-
-	result.WriteString("targets:\n")
-
-	for _, t := range b.targets {
-		fmt.Fprintf(&result, "  - path: %q\n", t)
-	}
-
 	if len(b.variables) > 0 {
 		result.WriteString("variables:\n")
 
@@ -113,10 +112,10 @@ func (b *ConfigBuilder) Build() string {
 		}
 	}
 
-	result.WriteString("jobs:\n")
+	result.WriteString("mappings:\n")
 
-	for _, job := range b.jobs {
-		writeJob(&result, job)
+	for _, m := range b.mappings {
+		writeMapping(&result, m)
 	}
 
 	return result.String()
@@ -154,24 +153,46 @@ func (b *ConfigBuilder) writeIncludes(writer *strings.Builder) {
 	}
 }
 
+func writeMapping(writer *strings.Builder, mapping mappingDef) {
+	fmt.Fprintf(writer, "  - name: %q\n", mapping.name)
+	fmt.Fprintf(writer, "    source: %q\n", mapping.source)
+	fmt.Fprintf(writer, "    target: %q\n", mapping.target)
+
+	if len(mapping.exclusions) > 0 {
+		writer.WriteString("    exclusions:\n")
+
+		for _, e := range mapping.exclusions {
+			fmt.Fprintf(writer, "      - %q\n", e)
+		}
+	}
+
+	if len(mapping.jobs) > 0 {
+		writer.WriteString("    jobs:\n")
+
+		for _, job := range mapping.jobs {
+			writeJob(writer, job)
+		}
+	}
+}
+
 func writeJob(writer *strings.Builder, job jobDef) {
-	fmt.Fprintf(writer, "  - name: %q\n", job.name)
-	fmt.Fprintf(writer, "    source: %q\n", job.source)
-	fmt.Fprintf(writer, "    target: %q\n", job.target)
+	fmt.Fprintf(writer, "      - name: %q\n", job.name)
+	fmt.Fprintf(writer, "        source: %q\n", job.source)
+	fmt.Fprintf(writer, "        target: %q\n", job.target)
 
 	if job.delete != nil {
-		fmt.Fprintf(writer, "    delete: %v\n", *job.delete)
+		fmt.Fprintf(writer, "        delete: %v\n", *job.delete)
 	}
 
 	if job.enabled != nil {
-		fmt.Fprintf(writer, "    enabled: %v\n", *job.enabled)
+		fmt.Fprintf(writer, "        enabled: %v\n", *job.enabled)
 	}
 
 	if len(job.exclusions) > 0 {
-		writer.WriteString("    exclusions:\n")
+		writer.WriteString("        exclusions:\n")
 
 		for _, e := range job.exclusions {
-			fmt.Fprintf(writer, "      - %q\n", e)
+			fmt.Fprintf(writer, "          - %q\n", e)
 		}
 	}
 }

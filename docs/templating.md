@@ -16,8 +16,8 @@ single template plus a lightweight orchestration file.
 
 Variables are referenced with `${variable_name}` syntax and can appear in:
 
+- **Mapping fields**: `name`, `source`, `target`
 - **Job fields**: `name`, `source`, `target`
-- **Source and target paths** (top-level `sources` / `targets` sections)
 - **Other variables** (variable-to-variable references)
 
 ### Variable Resolution Order
@@ -25,28 +25,32 @@ Variables are referenced with `${variable_name}` syntax and can appear in:
 1. Variables defined in the YAML `variables` section are loaded
 2. CLI `--set` overrides are merged in (overwriting any matching keys)
 3. Variable self-references are resolved (multi-pass, up to 10 iterations)
-4. All config fields are substituted using the fully resolved variables
+4. All mapping and job fields are substituted using the fully resolved variables
+5. Job relative paths are joined with their mapping's base paths to produce absolute paths
 
 This means variables can reference other variables:
 
 ```yaml
 variables:
-  source_home: "/home/${user}"
-  target_base: "/mnt/backup1/${user}"
+  user: alice
 
-jobs:
-  - name: "${user}_documents"
-    source: "${source_home}/Documents/"
-    target: "${target_base}/documents"
+mappings:
+  - name: "home"
+    source: "/home/${user}"
+    target: "/mnt/backup1/${user}"
+    jobs:
+      - name: "${user}_documents"
+        source: "Documents"
+        target: "documents"
 ```
 
 When invoked with `--set user=alice`, the resolution chain is:
 
 1. `user` = `alice` (from CLI)
-2. `source_home` = `/home/${user}` → `/home/alice`
-3. `target_base` = `/mnt/backup1/${user}` → `/mnt/backup1/alice`
+2. Mapping source = `/home/${user}` → `/home/alice`
+3. Mapping target = `/mnt/backup1/${user}` → `/mnt/backup1/alice`
 4. Job name = `${user}_documents` → `alice_documents`
-5. Job source = `${source_home}/Documents/` → `/home/alice/Documents/`
+5. Job source = `Documents` joined with `/home/alice` → `/home/alice/Documents/`
 
 ## Declaring Required Variables (`template:`)
 
@@ -94,7 +98,7 @@ include:
 2. The `with` values are merged into the template's `variables` map
 3. Template variable validation runs (all `template.variables` must be set)
 4. The template is resolved (variable substitution)
-5. The resolved sources, targets, and jobs are appended to the main config
+5. The resolved mappings (with their jobs) are appended to the main config
 6. After all includes are expanded, the main config goes through standard
    validation (job names, paths, overlaps)
 

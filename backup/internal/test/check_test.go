@@ -101,48 +101,39 @@ func TestListUncoveredPathsVariations(t *testing.T) {
 		cfg       Config
 		wantPaths []string
 	}{
-		{
-			name:   "AllCovered",
+		{name: "AllCovered",
 			fakeFS: map[string][]string{"/var/log": {"app1", "app2"}, "/tmp": {"cache", "temp"}},
-			cfg: Config{
-				Sources: []Path{{Path: "/var/log"}, {Path: "/tmp"}},
-				Jobs:    []Job{{Name: "Job1", Source: "/var/log"}, {Name: "Job2", Source: "/tmp"}},
-			},
-		},
-		{
-			name: "OneCoveredOneUncovered",
+			cfg: Config{Mappings: []Mapping{
+				{Name: "logs", Source: "/var/log", Target: "/bak/log", Jobs: []Job{{Name: "Job1", Source: "/var/log"}}},
+				{Name: "tmp", Source: "/tmp", Target: "/bak/tmp", Jobs: []Job{{Name: "Job2", Source: "/tmp"}}},
+			}}},
+		{name: "OneCoveredOneUncovered",
 			fakeFS: map[string][]string{
 				"/home/data": {"projects", "media"}, "/home/user": {"cache", "npm"},
 				"/home/user/cache": {}, "/home/user/npm": {},
 			},
-			cfg: Config{
-				Sources: []Path{{Path: "/home/data"}, {Path: "/home/user"}},
-				Jobs:    []Job{{Name: "Job1", Source: "/home/data"}},
-			},
-			wantPaths: []string{"/home/user"},
-		},
-		{
-			name:   "UncoveredExcluded",
+			cfg: Config{Mappings: []Mapping{
+				{Name: "data", Source: "/home/data", Target: "/bak/data", Jobs: []Job{{Name: "Job1", Source: "/home/data"}}},
+				{Name: "user", Source: "/home/user", Target: "/bak/user", Jobs: []Job{}},
+			}},
+			wantPaths: []string{"/home/user"}},
+		{name: "UncoveredExcluded",
 			fakeFS: map[string][]string{"/home/data": {"projects", "media"}},
-			cfg: Config{
-				Sources: []Path{{Path: "/home/data", Exclusions: []string{"media"}}},
-				Jobs:    []Job{{Name: "Job1", Source: "/home/data/projects"}},
-			},
-		},
-		{
-			name: "SubfoldersCovered",
+			cfg: Config{Mappings: []Mapping{
+				{Name: "data", Source: "/home/data", Target: "/bak/data", Exclusions: []string{"media"},
+					Jobs: []Job{{Name: "Job1", Source: "/home/data/projects"}}},
+			}}},
+		{name: "SubfoldersCovered",
 			fakeFS: map[string][]string{
 				"/home/data": {"family"}, "/home/data/family": {"me", "you"},
 				"/home/data/family/me": {"a"}, "/home/data/family/you": {"a"},
 			},
-			cfg: Config{
-				Sources: []Path{{Path: "/home/data"}},
-				Jobs: []Job{
+			cfg: Config{Mappings: []Mapping{
+				{Name: "data", Source: "/home/data", Target: "/bak/data", Jobs: []Job{
 					{Name: "JobMe", Source: "/home/data/family/me"},
 					{Name: "JobYou", Source: "/home/data/family/you"},
-				},
-			},
-		},
+				}},
+			}}},
 	}
 
 	for _, test := range tests {
@@ -165,11 +156,10 @@ func TestListUncoveredPaths_JobExclusion(t *testing.T) {
 			"/data/cache": {},
 		},
 		Config{
-			Sources: []Path{
-				{Path: "/data"},
-			},
-			Jobs: []Job{
-				{Name: "backup", Source: "/data/", Exclusions: []string{"cache"}},
+			Mappings: []Mapping{
+				{Name: "data", Source: "/data", Target: "/bak/data", Jobs: []Job{
+					{Name: "backup", Source: "/data/", Exclusions: []string{"cache"}},
+				}},
 			},
 		},
 		[]string{},
@@ -186,12 +176,9 @@ func TestListUncoveredPaths_DuplicateSourcesSkipped(t *testing.T) {
 	checker := newTestChecker(fs, &logBuf)
 
 	cfg := Config{
-		Sources: []Path{
-			{Path: "/data"},
-			{Path: "/data"},
-		},
-		Jobs: []Job{
-			{Name: "backup", Source: "/data"},
+		Mappings: []Mapping{
+			{Name: "m1", Source: "/data", Target: "/bak1", Jobs: []Job{{Name: "backup", Source: "/data"}}},
+			{Name: "m2", Source: "/data", Target: "/bak2", Jobs: []Job{}},
 		},
 	}
 
@@ -211,10 +198,9 @@ func TestListUncoveredPaths_UnreadableDirectory(t *testing.T) {
 	checker := newTestChecker(fs, &logBuf)
 
 	cfg := Config{
-		Sources: []Path{
-			{Path: "/data"},
+		Mappings: []Mapping{
+			{Name: "data", Source: "/data", Target: "/bak", Jobs: []Job{}},
 		},
-		Jobs: []Job{},
 	}
 
 	result := checker.ListUncoveredPaths(cfg)
@@ -235,14 +221,13 @@ func TestListUncoveredPaths_ChildPathExcludedByJob(t *testing.T) {
 	checker := newTestChecker(fs, &logBuf)
 
 	cfg := Config{
-		Sources: []Path{
-			{Path: "/data/stuff"},
-		},
-		Jobs: []Job{
-			// Source "/data" with exclusion "stuff/cache" so exclusionPath = "/data/stuff/cache"
-			{Name: "data-backup", Source: "/data", Exclusions: []string{"stuff/cache"}},
-			// Covers the /data/stuff/docs child directly
-			{Name: "docs", Source: "/data/stuff/docs"},
+		Mappings: []Mapping{
+			{Name: "stuff", Source: "/data/stuff", Target: "/bak/stuff", Jobs: []Job{
+				// Source "/data" with exclusion "stuff/cache" so exclusionPath = "/data/stuff/cache"
+				{Name: "data-backup", Source: "/data", Exclusions: []string{"stuff/cache"}},
+				// Covers the /data/stuff/docs child directly
+				{Name: "docs", Source: "/data/stuff/docs"},
+			}},
 		},
 	}
 
@@ -262,12 +247,10 @@ func TestListUncoveredPaths_GloballyExcludedSourceSkipped(t *testing.T) {
 	checker := newTestChecker(fs, &logBuf)
 
 	cfg := Config{
-		Sources: []Path{
-			{Path: "/data", Exclusions: []string{"cache"}},
-			{Path: "/data/cache"},
-		},
-		Jobs: []Job{
-			{Name: "backup", Source: "/data"},
+		Mappings: []Mapping{
+			{Name: "data", Source: "/data", Target: "/bak/data", Exclusions: []string{"cache"},
+				Jobs: []Job{{Name: "backup", Source: "/data"}}},
+			{Name: "cache", Source: "/data/cache", Target: "/bak/cache", Jobs: []Job{}},
 		},
 	}
 

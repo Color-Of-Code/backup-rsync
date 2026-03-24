@@ -210,17 +210,32 @@ func findInnermostMacro(input string) (int, int, string, string, bool) {
 func ValidateNoUnresolvedMacros(cfg Config) error {
 	var errs []error
 
-	for _, job := range cfg.Jobs {
+	for _, mapping := range cfg.Mappings {
 		for _, field := range []struct {
 			name, value string
 		}{
-			{"source", job.Source},
-			{"target", job.Target},
-			{"name", job.Name},
+			{"mapping source", mapping.Source},
+			{"mapping target", mapping.Target},
+			{"mapping name", mapping.Name},
 		} {
 			if strings.Contains(field.value, macroPrefix) {
 				errs = append(errs, fmt.Errorf(
-					"%w in job %q field %q: %s", ErrUnresolvedMacro, job.Name, field.name, field.value))
+					"%w in mapping %q field %q: %s", ErrUnresolvedMacro, mapping.Name, field.name, field.value))
+			}
+		}
+
+		for _, job := range mapping.Jobs {
+			for _, field := range []struct {
+				name, value string
+			}{
+				{"source", job.Source},
+				{"target", job.Target},
+				{"name", job.Name},
+			} {
+				if strings.Contains(field.value, macroPrefix) {
+					errs = append(errs, fmt.Errorf(
+						"%w in job %q field %q: %s", ErrUnresolvedMacro, job.Name, field.name, field.value))
+				}
 			}
 		}
 	}

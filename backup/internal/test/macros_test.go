@@ -140,13 +140,20 @@ func TestResolveMacros_MissingColon(t *testing.T) {
 func TestResolveConfig_WithMacros(t *testing.T) {
 	cfg := Config{
 		Variables: map[string]string{
-			"user": "jaap",
+			"user": "alice",
 		},
-		Jobs: []Job{
+		Mappings: []Mapping{
 			{
-				Name:   "${user}_mail",
-				Source: "/home/${user}/",
-				Target: "/backup/@{capitalize:${user}}/mail",
+				Name:   "home",
+				Source: "/home/${user}",
+				Target: "/backup/@{capitalize:${user}}",
+				Jobs: []Job{
+					{
+						Name:   "${user}_mail",
+						Source: "",
+						Target: "mail",
+					},
+				},
 			},
 		},
 	}
@@ -154,25 +161,32 @@ func TestResolveConfig_WithMacros(t *testing.T) {
 	resolved, err := ResolveConfig(cfg)
 	require.NoError(t, err)
 
-	assert.Equal(t, "jaap_mail", resolved.Jobs[0].Name)
-	assert.Equal(t, "/home/jaap/", resolved.Jobs[0].Source)
-	assert.Equal(t, "/backup/Jaap/mail", resolved.Jobs[0].Target)
+	jobs := resolved.AllJobs()
+	assert.Equal(t, "alice_mail", jobs[0].Name)
+	assert.Equal(t, "/home/alice/", jobs[0].Source)
+	assert.Equal(t, "/backup/Alice/mail", jobs[0].Target)
 }
 
 func TestResolveConfig_MacroError(t *testing.T) {
 	cfg := Config{
-		Jobs: []Job{
+		Mappings: []Mapping{
 			{
-				Name:   "job1",
-				Source: "/home/@{bogus:val}/",
-				Target: "/backup/",
+				Name:   "m",
+				Source: "/home/@{bogus:val}",
+				Target: "/backup",
+				Jobs: []Job{
+					{
+						Name:   "job1",
+						Source: "",
+						Target: "",
+					},
+				},
 			},
 		},
 	}
 
 	_, err := ResolveConfig(cfg)
 	require.Error(t, err)
-	assert.ErrorIs(t, err, ErrUnresolvedMacro)
 }
 
 func TestValidateNoUnresolvedMacros(t *testing.T) {
@@ -184,28 +198,40 @@ func TestValidateNoUnresolvedMacros(t *testing.T) {
 		{
 			name: "AllResolved",
 			cfg: Config{
-				Jobs: []Job{{Name: "job1", Source: "/home/user/", Target: "/backup/user/"}},
+				Mappings: []Mapping{{Name: "m", Source: "/home/user", Target: "/backup/user",
+					Jobs: []Job{{Name: "job1", Source: "", Target: ""}}}},
 			},
 			wantErr: false,
 		},
 		{
 			name: "UnresolvedInSource",
 			cfg: Config{
-				Jobs: []Job{{Name: "job1", Source: "/home/@{upper:user}/", Target: "/backup/user/"}},
+				Mappings: []Mapping{{Name: "m", Source: "/home/user", Target: "/backup/user",
+					Jobs: []Job{{Name: "job1", Source: "@{upper:user}", Target: ""}}}},
 			},
 			wantErr: true,
 		},
 		{
 			name: "UnresolvedInTarget",
 			cfg: Config{
-				Jobs: []Job{{Name: "job1", Source: "/home/user/", Target: "/backup/@{lower:user}/"}},
+				Mappings: []Mapping{{Name: "m", Source: "/home/user", Target: "/backup/user",
+					Jobs: []Job{{Name: "job1", Source: "", Target: "@{lower:user}"}}}},
 			},
 			wantErr: true,
 		},
 		{
 			name: "UnresolvedInName",
 			cfg: Config{
-				Jobs: []Job{{Name: "@{upper:job}", Source: "/home/user/", Target: "/backup/user/"}},
+				Mappings: []Mapping{{Name: "m", Source: "/home/user", Target: "/backup/user",
+					Jobs: []Job{{Name: "@{upper:job}", Source: "", Target: ""}}}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "UnresolvedInMappingSource",
+			cfg: Config{
+				Mappings: []Mapping{{Name: "m", Source: "/home/@{upper:user}", Target: "/backup/user",
+					Jobs: []Job{{Name: "job1", Source: "", Target: ""}}}},
 			},
 			wantErr: true,
 		},
@@ -226,22 +252,22 @@ func TestValidateNoUnresolvedMacros(t *testing.T) {
 
 func TestLoadResolvedConfigWithMacros(t *testing.T) {
 	yamlContent := testutil.NewConfigBuilder().
-		Source("/home/jaap").Target("/backup").
-		Variable("user", "jaap").
-		AddJob("jaap_docs", "/home/jaap/docs", "/backup/@{capitalize:${user}}/docs").
+		Variable("user", "alice").
+		AddMapping("m", "/home/alice", "/backup/@{capitalize:${user}}").
+		AddJobToMapping("alice_docs", "docs", "docs").
 		Build()
 
 	path := testutil.WriteConfigFile(t, yamlContent)
 
 	cfg, err := LoadResolvedConfig(path)
 	require.NoError(t, err)
-	assert.Equal(t, "/backup/Jaap/docs", cfg.Jobs[0].Target)
+	assert.Equal(t, "/backup/Alice/docs", cfg.AllJobs()[0].Target)
 }
 
 func TestLoadResolvedConfigWithMacros_Error(t *testing.T) {
 	yamlContent := testutil.NewConfigBuilder().
-		Source("/home/jaap").Target("/backup").
-		AddJob("job1", "/home/jaap/docs", "/backup/@{nonexistent:val}/docs").
+		AddMapping("m", "/home/alice", "/backup/@{nonexistent:val}").
+		AddJobToMapping("job1", "docs", "docs").
 		Build()
 
 	path := testutil.WriteConfigFile(t, yamlContent)

@@ -17,8 +17,6 @@ import (
 // Static errors for wrapping..
 var (
 	ErrJobValidation       = errors.New("job validation failed")
-	ErrInvalidPath         = errors.New("invalid path")
-	ErrPathValidation      = errors.New("path validation failed")
 	ErrOverlappingPath     = errors.New("overlapping path detected")
 	ErrJobFailure          = errors.New("one or more jobs failed")
 	ErrMissingTemplateVars = errors.New("missing required template variables")
@@ -36,14 +34,58 @@ type Include struct {
 	With map[string]string `yaml:"with"`
 }
 
+// Mapping defines a source-to-target directory pair with its own list of backup jobs.
+// Job paths within a mapping are relative to the mapping's Source and Target.
+type Mapping struct {
+	Name       string   `yaml:"name"`
+	Source     string   `yaml:"source"`
+	Target     string   `yaml:"target"`
+	Exclusions []string `yaml:"exclusions,omitempty"`
+	Jobs       []Job    `yaml:"jobs"`
+}
+
 // Config represents the overall backup configuration.
 type Config struct {
 	Template  *Template         `yaml:"template,omitempty"`
 	Include   []Include         `yaml:"include,omitempty"`
-	Sources   []Path            `yaml:"sources"`
-	Targets   []Path            `yaml:"targets"`
-	Variables map[string]string `yaml:"variables"`
-	Jobs      []Job             `yaml:"jobs"`
+	Variables map[string]string `yaml:"variables,omitempty"`
+	Mappings  []Mapping         `yaml:"mappings"`
+}
+
+// AllJobs returns a flat list of all jobs across all mappings.
+func (cfg Config) AllJobs() []Job {
+	var jobs []Job
+	for _, m := range cfg.Mappings {
+		jobs = append(jobs, m.Jobs...)
+	}
+
+	return jobs
+}
+
+// AllSources derives a []Path from all mapping sources and their exclusions.
+func (cfg Config) AllSources() []Path {
+	sources := make([]Path, 0, len(cfg.Mappings))
+	for _, m := range cfg.Mappings {
+		sources = append(sources, Path{Path: m.Source, Exclusions: m.Exclusions})
+	}
+
+	return sources
+}
+
+// AllTargets derives a deduplicated []Path from all mapping targets.
+func (cfg Config) AllTargets() []Path {
+	seen := make(map[string]bool)
+
+	var targets []Path
+
+	for _, m := range cfg.Mappings {
+		if !seen[m.Target] {
+			seen[m.Target] = true
+			targets = append(targets, Path{Path: m.Target})
+		}
+	}
+
+	return targets
 }
 
 func (cfg Config) String() string {
@@ -65,8 +107,9 @@ func (cfg Config) Apply(rsync JobCommand, logger *log.Logger) error {
 	}
 
 	counts := make(map[JobStatus]int)
+	allJobs := cfg.AllJobs()
 
-	for _, job := range cfg.Jobs {
+	for _, job := range allJobs {
 		status := job.Apply(rsync)
 		rsync.ReportJobStatus(job.Name, status, logger)
 		counts[status]++
@@ -75,7 +118,7 @@ func (cfg Config) Apply(rsync JobCommand, logger *log.Logger) error {
 	rsync.ReportSummary(counts, logger)
 
 	if counts[Failure] > 0 {
-		return fmt.Errorf("%w: %d of %d jobs", ErrJobFailure, counts[Failure], len(cfg.Jobs))
+		return fmt.Errorf("%w: %d of %d jobs", ErrJobFailure, counts[Failure], len(allJobs))
 	}
 
 	return nil
@@ -142,48 +185,103 @@ func ResolveVariables(variables map[string]string) map[string]string {
 	return resolved
 }
 
+// resolveTemplateVariables resolves variables and macros in a template config
+// without joining job paths with mapping base paths. Used by expandIncludes so
+// that path joining happens only once in the outer ResolveConfig call.
+func resolveTemplateVariables(cfg Config) (Config, error) {
+	resolved := cfg
+	resolved.Variables = ResolveVariables(cfg.Variables)
+
+	for mIdx := range resolved.Mappings {
+		mapping := &resolved.Mappings[mIdx]
+
+		var err error
+
+		mapping.Name, err = resolveField(mapping.Name, resolved.Variables)
+		if err != nil {
+			return Config{}, fmt.Errorf("resolving mapping name %q: %w", mapping.Name, err)
+		}
+
+		mapping.Source, err = resolveField(mapping.Source, resolved.Variables)
+		if err != nil {
+			return Config{}, fmt.Errorf("resolving mapping source %q: %w", mapping.Source, err)
+		}
+
+		mapping.Target, err = resolveField(mapping.Target, resolved.Variables)
+		if err != nil {
+			return Config{}, fmt.Errorf("resolving mapping target %q: %w", mapping.Target, err)
+		}
+
+		for jIdx := range mapping.Jobs {
+			job := &mapping.Jobs[jIdx]
+
+			job.Name, err = resolveField(job.Name, resolved.Variables)
+			if err != nil {
+				return Config{}, fmt.Errorf("resolving job name %q: %w", job.Name, err)
+			}
+
+			job.Source, err = resolveField(job.Source, resolved.Variables)
+			if err != nil {
+				return Config{}, fmt.Errorf("resolving job source %q: %w", job.Source, err)
+			}
+
+			job.Target, err = resolveField(job.Target, resolved.Variables)
+			if err != nil {
+				return Config{}, fmt.Errorf("resolving job target %q: %w", job.Target, err)
+			}
+		}
+	}
+
+	return resolved, nil
+}
+
 func ResolveConfig(cfg Config) (Config, error) {
 	resolvedCfg := cfg
 
 	resolvedCfg.Variables = ResolveVariables(cfg.Variables)
 
-	for idx, source := range resolvedCfg.Sources {
-		resolved, err := resolveField(source.Path, resolvedCfg.Variables)
-		if err != nil {
-			return Config{}, fmt.Errorf("resolving source path %q: %w", source.Path, err)
-		}
-
-		resolvedCfg.Sources[idx].Path = resolved
-	}
-
-	for idx, target := range resolvedCfg.Targets {
-		resolved, err := resolveField(target.Path, resolvedCfg.Variables)
-		if err != nil {
-			return Config{}, fmt.Errorf("resolving target path %q: %w", target.Path, err)
-		}
-
-		resolvedCfg.Targets[idx].Path = resolved
-	}
-
-	for idx := range resolvedCfg.Jobs {
-		job := &resolvedCfg.Jobs[idx]
-
-		errs := make([]error, 0, 3) //nolint:mnd // 3 fields to resolve: Source, Target, Name
+	for mIdx := range resolvedCfg.Mappings {
+		mapping := &resolvedCfg.Mappings[mIdx]
 
 		var err error
 
-		job.Source, err = resolveField(job.Source, resolvedCfg.Variables)
-		errs = append(errs, err)
+		mapping.Name, err = resolveField(mapping.Name, resolvedCfg.Variables)
+		if err != nil {
+			return Config{}, fmt.Errorf("resolving mapping name %q: %w", mapping.Name, err)
+		}
 
-		job.Target, err = resolveField(job.Target, resolvedCfg.Variables)
-		errs = append(errs, err)
+		mapping.Source, err = resolveField(mapping.Source, resolvedCfg.Variables)
+		if err != nil {
+			return Config{}, fmt.Errorf("resolving mapping source %q: %w", mapping.Source, err)
+		}
 
-		job.Name, err = resolveField(job.Name, resolvedCfg.Variables)
-		errs = append(errs, err)
+		mapping.Target, err = resolveField(mapping.Target, resolvedCfg.Variables)
+		if err != nil {
+			return Config{}, fmt.Errorf("resolving mapping target %q: %w", mapping.Target, err)
+		}
 
-		joined := errors.Join(errs...)
-		if joined != nil {
-			return Config{}, fmt.Errorf("resolving job %q: %w", job.Name, joined)
+		for jIdx := range mapping.Jobs {
+			job := &mapping.Jobs[jIdx]
+
+			errs := make([]error, 0, 3) //nolint:mnd // 3 fields to resolve: Source, Target, Name
+
+			job.Name, err = resolveField(job.Name, resolvedCfg.Variables)
+			errs = append(errs, err)
+
+			job.Source, err = resolveField(job.Source, resolvedCfg.Variables)
+			errs = append(errs, err)
+
+			job.Target, err = resolveField(job.Target, resolvedCfg.Variables)
+			errs = append(errs, err)
+
+			joined := errors.Join(errs...)
+			if joined != nil {
+				return Config{}, fmt.Errorf("resolving job %q: %w", job.Name, joined)
+			}
+
+			// Join relative job paths with mapping base paths
+			job.Source = filepath.Join(mapping.Source, job.Source) + "/"
+			job.Target = filepath.Join(mapping.Target, job.Target)
 		}
 	}
 
@@ -214,30 +312,6 @@ func ValidateJobNames(jobs []Job) error {
 
 	if len(invalidNames) > 0 {
 		return fmt.Errorf("%w: %v", ErrJobValidation, invalidNames)
-	}
-
-	return nil
-}
-
-func ValidatePath(jobPath string, paths []Path, pathType string, jobName string) error {
-	if slices.ContainsFunc(paths, func(p Path) bool { return strings.HasPrefix(jobPath, p.Path) }) {
-		return nil
-	}
-
-	return fmt.Errorf("%w for job '%s': %s %s", ErrInvalidPath, jobName, pathType, jobPath)
-}
-
-func ValidatePaths(cfg Config) error {
-	errs := make([]error, 0, len(cfg.Jobs)*2) //nolint:mnd // 2 validations per job: source + target
-
-	for _, job := range cfg.Jobs {
-		errs = append(errs, ValidatePath(job.Source, cfg.Sources, "source", job.Name))
-		errs = append(errs, ValidatePath(job.Target, cfg.Targets, "target", job.Name))
-	}
-
-	joined := errors.Join(errs...)
-	if joined != nil {
-		return fmt.Errorf("%w: %w", ErrPathValidation, joined)
 	}
 
 	return nil
@@ -327,14 +401,12 @@ func expandIncludes(cfg *Config, configDir string) error {
 			return fmt.Errorf("include %q: %w", inc.Uses, err)
 		}
 
-		resolved, err := ResolveConfig(tmplCfg)
+		resolved, err := resolveTemplateVariables(tmplCfg)
 		if err != nil {
 			return fmt.Errorf("include %q: resolving config: %w", inc.Uses, err)
 		}
 
-		cfg.Sources = append(cfg.Sources, resolved.Sources...)
-		cfg.Targets = append(cfg.Targets, resolved.Targets...)
-		cfg.Jobs = append(cfg.Jobs, resolved.Jobs...)
+		cfg.Mappings = append(cfg.Mappings, resolved.Mappings...)
 	}
 
 	cfg.Include = nil
@@ -387,22 +459,19 @@ func resolveAndValidate(cfg Config, configDir string) (Config, error) {
 		return Config{}, fmt.Errorf("config resolution failed: %w", err)
 	}
 
-	err = ValidateJobNames(resolvedCfg.Jobs)
+	allJobs := resolvedCfg.AllJobs()
+
+	err = ValidateJobNames(allJobs)
 	if err != nil {
 		return Config{}, fmt.Errorf("job validation failed: %w", err)
 	}
 
-	err = ValidatePaths(resolvedCfg)
-	if err != nil {
-		return Config{}, fmt.Errorf("path validation failed: %w", err)
-	}
-
-	err = validateJobPaths(resolvedCfg.Jobs, "source", func(job Job) string { return job.Source })
+	err = validateJobPaths(allJobs, "source", func(job Job) string { return job.Source })
 	if err != nil {
 		return Config{}, fmt.Errorf("job source path validation failed: %w", err)
 	}
 
-	err = validateJobPaths(resolvedCfg.Jobs, "target", func(job Job) string { return job.Target })
+	err = validateJobPaths(allJobs, "target", func(job Job) string { return job.Target })
 	if err != nil {
 		return Config{}, fmt.Errorf("job target path validation failed: %w", err)
 	}
