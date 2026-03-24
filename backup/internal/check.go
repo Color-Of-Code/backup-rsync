@@ -2,7 +2,7 @@ package internal
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,7 +12,7 @@ import (
 
 // CoverageChecker analyzes path coverage against a configuration.
 type CoverageChecker struct {
-	Logger *log.Logger
+	Logger *slog.Logger
 	Fs     afero.Fs
 }
 
@@ -21,8 +21,8 @@ func (c *CoverageChecker) IsExcludedGlobally(path string, mappings []Mapping) bo
 		for _, exclusion := range mapping.Exclusions {
 			exclusionPath := filepath.Join(mapping.Source, exclusion)
 			if strings.HasPrefix(NormalizePath(path), exclusionPath) {
-				c.Logger.Printf("EXCLUDED: Path '%s' is globally excluded by '%s' in source '%s'",
-					path, exclusion, mapping.Source)
+				c.Logger.Info(fmt.Sprintf("EXCLUDED: Path '%s' is globally excluded by '%s' in source '%s'",
+					path, exclusion, mapping.Source))
 
 				return true
 			}
@@ -56,13 +56,13 @@ func (c *CoverageChecker) isExcluded(path string, job Job) bool {
 
 func (c *CoverageChecker) isCoveredByJob(path string, job Job) bool {
 	if NormalizePath(job.Source) == NormalizePath(path) {
-		c.Logger.Printf("COVERED: Path '%s' is covered by job '%s'", path, job.Name)
+		c.Logger.Info(fmt.Sprintf("COVERED: Path '%s' is covered by job '%s'", path, job.Name))
 
 		return true
 	}
 
 	if c.isExcluded(path, job) {
-		c.Logger.Printf("EXCLUDED: Path '%s' is excluded by job '%s'", path, job.Name)
+		c.Logger.Info(fmt.Sprintf("EXCLUDED: Path '%s' is excluded by job '%s'", path, job.Name))
 
 		return true
 	}
@@ -86,7 +86,7 @@ func (c *CoverageChecker) checkPath(
 	path string, mappings []Mapping, result *[]string, seen map[string]bool,
 ) {
 	if seen[path] {
-		c.Logger.Printf("SKIP: Path '%s' already seen", path)
+		c.Logger.Info(fmt.Sprintf("SKIP: Path '%s' already seen", path))
 
 		return
 	}
@@ -95,27 +95,27 @@ func (c *CoverageChecker) checkPath(
 
 	// Skip if globally excluded
 	if c.IsExcludedGlobally(path, mappings) {
-		c.Logger.Printf("SKIP: Path '%s' is globally excluded", path)
+		c.Logger.Info(fmt.Sprintf("SKIP: Path '%s' is globally excluded", path))
 
 		return
 	}
 
 	// Skip if covered by a job
 	if c.isCovered(path, mappings) {
-		c.Logger.Printf("SKIP: Path '%s' is covered by a job", path)
+		c.Logger.Info(fmt.Sprintf("SKIP: Path '%s' is covered by a job", path))
 
 		return
 	}
 
 	// Check if it's effectively covered through descendants
 	if c.isEffectivelyCovered(path, mappings) {
-		c.Logger.Printf("SKIP: Path '%s' is effectively covered", path)
+		c.Logger.Info(fmt.Sprintf("SKIP: Path '%s' is effectively covered", path))
 
 		return
 	}
 
 	// Add uncovered path
-	c.Logger.Printf("ADD: Path '%s' is uncovered", path)
+	c.Logger.Info(fmt.Sprintf("ADD: Path '%s' is uncovered", path))
 	*result = append(*result, path)
 }
 
@@ -124,13 +124,13 @@ func (c *CoverageChecker) checkPath(
 func (c *CoverageChecker) isEffectivelyCovered(path string, mappings []Mapping) bool {
 	children, err := getChildDirectories(c.Fs, path)
 	if err != nil {
-		c.Logger.Printf("ERROR: could not get child directories of '%s': %v", path, err)
+		c.Logger.Info(fmt.Sprintf("ERROR: could not get child directories of '%s': %v", path, err))
 
 		return false
 	}
 
 	if len(children) == 0 {
-		c.Logger.Printf("NOT COVERED: Path '%s' has no children", path)
+		c.Logger.Info(fmt.Sprintf("NOT COVERED: Path '%s' has no children", path))
 
 		return false // Leaf directories are not effectively covered unless directly covered
 	}
@@ -141,14 +141,14 @@ func (c *CoverageChecker) isEffectivelyCovered(path string, mappings []Mapping) 
 		covered := c.IsExcludedGlobally(child, mappings) || c.isCovered(child, mappings) ||
 			c.isEffectivelyCovered(child, mappings)
 		if !covered {
-			c.Logger.Printf("UNCOVERED CHILD: Path '%s' has uncovered child '%s'", path, child)
+			c.Logger.Info(fmt.Sprintf("UNCOVERED CHILD: Path '%s' has uncovered child '%s'", path, child))
 
 			allCovered = false
 		}
 	}
 
 	if allCovered {
-		c.Logger.Printf("COVERED: Path '%s' is effectively covered", path)
+		c.Logger.Info(fmt.Sprintf("COVERED: Path '%s' is effectively covered", path))
 	}
 
 	return allCovered

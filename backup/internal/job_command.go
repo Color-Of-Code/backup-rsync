@@ -1,6 +1,6 @@
 package internal
 
-import "log"
+import "log/slog"
 
 // JobStatus represents the outcome of a job execution.
 type JobStatus string
@@ -18,6 +18,6 @@ const (
 type JobCommand interface {
 	Run(job Job) JobStatus
 	GetVersionInfo() (string, string, error)
-	ReportJobStatus(jobName string, status JobStatus, logger *log.Logger)
-	ReportSummary(counts map[JobStatus]int, logger *log.Logger)
+	ReportJobStatus(jobName string, status JobStatus, logger *slog.Logger)
+	ReportSummary(counts map[JobStatus]int, logger *slog.Logger)
 }

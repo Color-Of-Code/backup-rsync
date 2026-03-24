@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"bytes"
-	"log"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -277,7 +276,7 @@ func TestConfigApply_VersionInfoSuccess(t *testing.T) {
 
 	var logBuf bytes.Buffer
 
-	logger := log.New(&logBuf, "", 0)
+	logger := testutil.NewTestLogger(&logBuf)
 
 	cfg := Config{
 		Mappings: []Mapping{
@@ -311,7 +310,7 @@ func TestConfigApply_VersionInfoError(t *testing.T) {
 
 	var logBuf bytes.Buffer
 
-	logger := log.New(&logBuf, "", 0)
+	logger := testutil.NewTestLogger(&logBuf)
 
 	cfg := Config{
 		Mappings: []Mapping{

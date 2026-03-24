@@ -2,7 +2,7 @@ package internal
 
 import (
 	"io"
-	"log"
+	"log/slog"
 )
 
 // ListCommand prints the rsync commands that would be executed without running them.
@@ -17,9 +17,9 @@ func NewListCommand(binPath string, shell Exec, output io.Writer) ListCommand {
 	}
 }
 
-func (ListCommand) ReportJobStatus(_ string, _ JobStatus, _ *log.Logger) {}
+func (ListCommand) ReportJobStatus(_ string, _ JobStatus, _ *slog.Logger) {}
 
-func (ListCommand) ReportSummary(_ map[JobStatus]int, _ *log.Logger) {}
+func (ListCommand) ReportSummary(_ map[JobStatus]int, _ *slog.Logger) {}
 
 func (c ListCommand) Run(job Job) JobStatus {
 	logPath := c.JobLogPath(job)

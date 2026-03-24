@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,15 +43,15 @@ func (c SharedCommand) PrintArgs(job Job, args []string) {
 	fmt.Fprintf(c.Output, "Command: %s %s\n", c.BinPath, strings.Join(args, " "))
 }
 
-func (c SharedCommand) ReportJobStatus(jobName string, status JobStatus, logger *log.Logger) {
-	logger.Printf("STATUS [%s]: %s", jobName, status)
+func (c SharedCommand) ReportJobStatus(jobName string, status JobStatus, logger *slog.Logger) {
+	logger.Info(fmt.Sprintf("STATUS [%s]: %s", jobName, status))
 	fmt.Fprintf(c.Output, "Status [%s]: %s\n", jobName, status)
 }
 
-func (c SharedCommand) ReportSummary(counts map[JobStatus]int, logger *log.Logger) {
+func (c SharedCommand) ReportSummary(counts map[JobStatus]int, logger *slog.Logger) {
 	summary := fmt.Sprintf("Summary: %d succeeded, %d failed, %d skipped",
 		counts[Success], counts[Failure], counts[Skipped])
-	logger.Print(summary)
+	logger.Info(summary)
 	fmt.Fprintln(c.Output, summary)
 }
 

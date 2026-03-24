@@ -4,7 +4,7 @@ package internal
 import (
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,26 +13,17 @@ import (
 	"github.com/spf13/afero"
 )
 
-// UTCLogWriter wraps an io.Writer and prepends an ISO 8601 UTC timestamp to each write.
-type UTCLogWriter struct {
-	W   io.Writer
-	Now func() time.Time
-}
+// NewUTCTextHandler creates a slog.Handler that writes text logs with UTC timestamps.
+func NewUTCTextHandler(w io.Writer) slog.Handler {
+	return slog.NewTextHandler(w, &slog.HandlerOptions{
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				a.Value = slog.StringValue(a.Value.Time().UTC().Format(time.RFC3339))
+			}
 
-func (u *UTCLogWriter) Write(data []byte) (int, error) {
-	now := u.Now().UTC().Format(time.RFC3339)
-
-	_, err := fmt.Fprintf(u.W, "%s %s", now, data)
-	if err != nil {
-		return 0, fmt.Errorf("writing log entry: %w", err)
-	}
-
-	return len(data), nil
-}
-
-// NewUTCLogger creates a *log.Logger that writes ISO 8601 UTC timestamps.
-func NewUTCLogger(w io.Writer) *log.Logger {
-	return log.New(&UTCLogWriter{W: w, Now: time.Now}, "", 0)
+			return a
+		},
+	})
 }
 
 func NormalizePath(path string) string {
@@ -51,7 +42,7 @@ func GetLogPath(configPath string, now time.Time) string {
 
 func CreateMainLogger(
 	fs afero.Fs, logPath string,
-) (*log.Logger, func() error, error) {
+) (*slog.Logger, func() error, error) {
 	overallLogPath := logPath + "/summary.log"
 
 	err := fs.MkdirAll(logPath, LogDirPermission)
@@ -64,7 +55,7 @@ func CreateMainLogger(
 		return nil, nil, fmt.Errorf("failed to open overall log file: %w", err)
 	}
 
-	logger := NewUTCLogger(overallLogFile)
+	logger := slog.New(NewUTCTextHandler(overallLogFile))
 
 	cleanup := func() error {
 		return overallLogFile.Close()

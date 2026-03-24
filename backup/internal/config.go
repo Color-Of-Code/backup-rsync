@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"maps"
 	"os"
 	"path/filepath"
@@ -71,13 +71,13 @@ func (cfg Config) String() string {
 	return string(out)
 }
 
-func (cfg Config) Apply(rsync JobCommand, logger *log.Logger) error {
+func (cfg Config) Apply(rsync JobCommand, logger *slog.Logger) error {
 	versionInfo, fullpath, err := rsync.GetVersionInfo()
 	if err != nil {
-		logger.Printf("Failed to fetch rsync version: %v", err)
+		logger.Info(fmt.Sprintf("Failed to fetch rsync version: %v", err))
 	} else {
-		logger.Printf("Rsync Binary Path: %s", fullpath)
-		logger.Printf("Rsync Version Info: %s", versionInfo)
+		logger.Info("Rsync Binary Path: " + fullpath)
+		logger.Info("Rsync Version Info: " + versionInfo)
 	}
 
 	counts := make(map[JobStatus]int)

@@ -4,7 +4,7 @@ import (
 	"backup-rsync/backup/internal"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -13,10 +13,10 @@ import (
 )
 
 // LoggerFactory creates a logger, returning the logger, log directory path, cleanup function, and any error.
-type LoggerFactory func(fs afero.Fs, configPath string, now time.Time) (*log.Logger, string, func() error, error)
+type LoggerFactory func(fs afero.Fs, configPath string, now time.Time) (*slog.Logger, string, func() error, error)
 
-func discardLoggerFactory(_ afero.Fs, _ string, _ time.Time) (*log.Logger, string, func() error, error) {
-	return log.New(io.Discard, "", 0), "", func() error { return nil }, nil
+func discardLoggerFactory(_ afero.Fs, _ string, _ time.Time) (*slog.Logger, string, func() error, error) {
+	return slog.New(slog.DiscardHandler), "", func() error { return nil }, nil
 }
 
 type jobCommandOptions struct {

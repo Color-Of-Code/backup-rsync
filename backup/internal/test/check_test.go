@@ -3,12 +3,12 @@ package internal_test
 import (
 	"bytes"
 	"io"
-	"log"
 	"path/filepath"
 	"sort"
 	"testing"
 
 	. "backup-rsync/backup/internal"
+	"backup-rsync/backup/internal/testutil"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -16,14 +16,14 @@ import (
 
 func newTestChecker(fs afero.Fs, logBuf *bytes.Buffer) *CoverageChecker {
 	return &CoverageChecker{
-		Logger: log.New(logBuf, "", 0),
+		Logger: testutil.NewTestLogger(logBuf),
 		Fs:     fs,
 	}
 }
 
 func newSilentChecker(fs afero.Fs) *CoverageChecker {
 	return &CoverageChecker{
-		Logger: log.New(io.Discard, "", 0),
+		Logger: testutil.NewTestLogger(io.Discard),
 		Fs:     fs,
 	}
 }

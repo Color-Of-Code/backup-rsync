@@ -6,7 +6,7 @@ package internal_test
 
 import (
 	"backup-rsync/backup/internal"
-	"log"
+	"log/slog"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -98,7 +98,7 @@ func (_c *MockJobCommand_GetVersionInfo_Call) RunAndReturn(run func() (string, s
 }
 
 // ReportJobStatus provides a mock function for the type MockJobCommand
-func (_mock *MockJobCommand) ReportJobStatus(jobName string, status internal.JobStatus, logger *log.Logger) {
+func (_mock *MockJobCommand) ReportJobStatus(jobName string, status internal.JobStatus, logger *slog.Logger) {
 	_mock.Called(jobName, status, logger)
 	return
 }
@@ -111,12 +111,12 @@ type MockJobCommand_ReportJobStatus_Call struct {
 // ReportJobStatus is a helper method to define mock.On call
 //   - jobName string
 //   - status internal.JobStatus
-//   - logger *log.Logger
+//   - logger *slog.Logger
 func (_e *MockJobCommand_Expecter) ReportJobStatus(jobName interface{}, status interface{}, logger interface{}) *MockJobCommand_ReportJobStatus_Call {
 	return &MockJobCommand_ReportJobStatus_Call{Call: _e.mock.On("ReportJobStatus", jobName, status, logger)}
 }
 
-func (_c *MockJobCommand_ReportJobStatus_Call) Run(run func(jobName string, status internal.JobStatus, logger *log.Logger)) *MockJobCommand_ReportJobStatus_Call {
+func (_c *MockJobCommand_ReportJobStatus_Call) Run(run func(jobName string, status internal.JobStatus, logger *slog.Logger)) *MockJobCommand_ReportJobStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
@@ -126,9 +126,9 @@ func (_c *MockJobCommand_ReportJobStatus_Call) Run(run func(jobName string, stat
 		if args[1] != nil {
 			arg1 = args[1].(internal.JobStatus)
 		}
-		var arg2 *log.Logger
+		var arg2 *slog.Logger
 		if args[2] != nil {
-			arg2 = args[2].(*log.Logger)
+			arg2 = args[2].(*slog.Logger)
 		}
 		run(
 			arg0,
@@ -144,13 +144,13 @@ func (_c *MockJobCommand_ReportJobStatus_Call) Return() *MockJobCommand_ReportJo
 	return _c
 }
 
-func (_c *MockJobCommand_ReportJobStatus_Call) RunAndReturn(run func(jobName string, status internal.JobStatus, logger *log.Logger)) *MockJobCommand_ReportJobStatus_Call {
+func (_c *MockJobCommand_ReportJobStatus_Call) RunAndReturn(run func(jobName string, status internal.JobStatus, logger *slog.Logger)) *MockJobCommand_ReportJobStatus_Call {
 	_c.Run(run)
 	return _c
 }
 
 // ReportSummary provides a mock function for the type MockJobCommand
-func (_mock *MockJobCommand) ReportSummary(counts map[internal.JobStatus]int, logger *log.Logger) {
+func (_mock *MockJobCommand) ReportSummary(counts map[internal.JobStatus]int, logger *slog.Logger) {
 	_mock.Called(counts, logger)
 	return
 }
@@ -162,20 +162,20 @@ type MockJobCommand_ReportSummary_Call struct {
 
 // ReportSummary is a helper method to define mock.On call
 //   - counts map[internal.JobStatus]int
-//   - logger *log.Logger
+//   - logger *slog.Logger
 func (_e *MockJobCommand_Expecter) ReportSummary(counts interface{}, logger interface{}) *MockJobCommand_ReportSummary_Call {
 	return &MockJobCommand_ReportSummary_Call{Call: _e.mock.On("ReportSummary", counts, logger)}
 }
 
-func (_c *MockJobCommand_ReportSummary_Call) Run(run func(counts map[internal.JobStatus]int, logger *log.Logger)) *MockJobCommand_ReportSummary_Call {
+func (_c *MockJobCommand_ReportSummary_Call) Run(run func(counts map[internal.JobStatus]int, logger *slog.Logger)) *MockJobCommand_ReportSummary_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 map[internal.JobStatus]int
 		if args[0] != nil {
 			arg0 = args[0].(map[internal.JobStatus]int)
 		}
-		var arg1 *log.Logger
+		var arg1 *slog.Logger
 		if args[1] != nil {
-			arg1 = args[1].(*log.Logger)
+			arg1 = args[1].(*slog.Logger)
 		}
 		run(
 			arg0,
@@ -190,7 +190,7 @@ func (_c *MockJobCommand_ReportSummary_Call) Return() *MockJobCommand_ReportSumm
 	return _c
 }
 
-func (_c *MockJobCommand_ReportSummary_Call) RunAndReturn(run func(counts map[internal.JobStatus]int, logger *log.Logger)) *MockJobCommand_ReportSummary_Call {
+func (_c *MockJobCommand_ReportSummary_Call) RunAndReturn(run func(counts map[internal.JobStatus]int, logger *slog.Logger)) *MockJobCommand_ReportSummary_Call {
 	_c.Run(run)
 	return _c
 }

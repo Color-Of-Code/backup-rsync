@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"backup-rsync/backup/internal"
@@ -24,7 +25,7 @@ func buildCheckCoverageCommand(fs afero.Fs) *cobra.Command {
 			}
 
 			checker := &internal.CoverageChecker{
-				Logger: internal.NewUTCLogger(os.Stderr),
+				Logger: slog.New(internal.NewUTCTextHandler(os.Stderr)),
 				Fs:     fs,
 			}
 
