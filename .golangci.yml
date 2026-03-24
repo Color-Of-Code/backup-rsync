@@ -27,6 +27,7 @@ linters:
             - strings
             - testing
             - time
+            - unicode
             - github.com/spf13/cobra
             - github.com/spf13/afero
             - github.com/stretchr/testify/assert
@@ -45,6 +46,8 @@ linters:
     varnamelen:
       ignore-decls:
         - fs afero.Fs
+        - fn MacroFunc
+        - ok bool
     wrapcheck:
       ignore-package-globs:
         - backup-rsync/*

@@ -87,14 +87,48 @@ func SubstituteVariables(input string, variables map[string]string) string {
 	return strings.NewReplacer(oldnew...).Replace(input)
 }
 
-func ResolveConfig(cfg Config) Config {
-	resolvedCfg := cfg
-	for i, job := range resolvedCfg.Jobs {
-		resolvedCfg.Jobs[i].Source = SubstituteVariables(job.Source, cfg.Variables)
-		resolvedCfg.Jobs[i].Target = SubstituteVariables(job.Target, cfg.Variables)
+func resolveField(input string, variables map[string]string) (string, error) {
+	result := SubstituteVariables(input, variables)
+
+	resolved, err := ResolveMacros(result)
+	if err != nil {
+		return "", err
 	}
 
-	return resolvedCfg
+	return resolved, nil
+}
+
+func ResolveConfig(cfg Config) (Config, error) {
+	resolvedCfg := cfg
+
+	for idx := range resolvedCfg.Jobs {
+		job := &resolvedCfg.Jobs[idx]
+
+		errs := make([]error, 0, 3) //nolint:mnd // 3 fields to resolve: Source, Target, Name
+
+		var err error
+
+		job.Source, err = resolveField(job.Source, cfg.Variables)
+		errs = append(errs, err)
+
+		job.Target, err = resolveField(job.Target, cfg.Variables)
+		errs = append(errs, err)
+
+		job.Name, err = resolveField(job.Name, cfg.Variables)
+		errs = append(errs, err)
+
+		joined := errors.Join(errs...)
+		if joined != nil {
+			return Config{}, fmt.Errorf("resolving job %q: %w", job.Name, joined)
+		}
+	}
+
+	err := ValidateNoUnresolvedMacros(resolvedCfg)
+	if err != nil {
+		return Config{}, fmt.Errorf("macro resolution incomplete: %w", err)
+	}
+
+	return resolvedCfg, nil
 }
 
 func ValidateJobNames(jobs []Job) error {
@@ -183,7 +217,10 @@ func LoadResolvedConfig(configPath string) (Config, error) {
 		return Config{}, fmt.Errorf("job validation failed: %w", err)
 	}
 
-	resolvedCfg := ResolveConfig(cfg)
+	resolvedCfg, err := ResolveConfig(cfg)
+	if err != nil {
+		return Config{}, fmt.Errorf("config resolution failed: %w", err)
+	}
 
 	err = ValidatePaths(resolvedCfg)
 	if err != nil {

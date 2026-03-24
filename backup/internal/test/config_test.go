@@ -297,7 +297,8 @@ func TestResolveConfig(t *testing.T) {
 		},
 	}
 
-	resolvedCfg := ResolveConfig(cfg)
+	resolvedCfg, err := ResolveConfig(cfg)
+	require.NoError(t, err)
 
 	assert.Equal(t, "/home/user/Documents", resolvedCfg.Jobs[0].Source)
 	assert.Equal(t, "/backup/user/Documents", resolvedCfg.Jobs[0].Target)

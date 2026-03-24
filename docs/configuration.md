@@ -33,6 +33,19 @@ variables:
   target_base: "/mnt/backup1"
 ```
 
+## Macros
+
+Macros apply string transformation functions to values using `@{function:argument}` syntax. Variables are resolved before macros, so they compose naturally. See [macros.md](macros.md) for the full list of available functions and detailed usage.
+
+```yaml
+variables:
+  user: alice
+
+jobs:
+  - name: "${user}_docs"
+    target: "/backup/@{capitalize:${user}}/docs"  # resolves to /backup/Alice/docs
+```
+
 ## Jobs
 
 Each job defines a backup operation:
