@@ -185,112 +185,80 @@ func ResolveVariables(variables map[string]string) map[string]string {
 	return resolved
 }
 
-// resolveTemplateVariables resolves variables and macros in a template config
-// without joining job paths with mapping base paths. Used by expandIncludes so
-// that path joining happens only once in the outer ResolveConfig call.
-func resolveTemplateVariables(cfg Config) (Config, error) {
+// resolveFields resolves variables and macros in all mapping and job fields.
+// When joinPaths is true, job paths are joined with their mapping base paths
+// and unresolved macros are validated — this is the final resolution step.
+// When joinPaths is false, only variable/macro substitution is performed,
+// used by expandIncludes so that path joining happens only once.
+func resolveFields(cfg Config, joinPaths bool) (Config, error) {
 	resolved := cfg
 	resolved.Variables = ResolveVariables(cfg.Variables)
 
 	for mIdx := range resolved.Mappings {
-		mapping := &resolved.Mappings[mIdx]
-
-		var err error
-
-		mapping.Name, err = resolveField(mapping.Name, resolved.Variables)
+		err := resolveMapping(&resolved.Mappings[mIdx], resolved.Variables, joinPaths)
 		if err != nil {
-			return Config{}, fmt.Errorf("resolving mapping name %q: %w", mapping.Name, err)
+			return Config{}, err
 		}
+	}
 
-		mapping.Source, err = resolveField(mapping.Source, resolved.Variables)
+	if joinPaths {
+		err := ValidateNoUnresolvedMacros(resolved)
 		if err != nil {
-			return Config{}, fmt.Errorf("resolving mapping source %q: %w", mapping.Source, err)
-		}
-
-		mapping.Target, err = resolveField(mapping.Target, resolved.Variables)
-		if err != nil {
-			return Config{}, fmt.Errorf("resolving mapping target %q: %w", mapping.Target, err)
-		}
-
-		for jIdx := range mapping.Jobs {
-			job := &mapping.Jobs[jIdx]
-
-			job.Name, err = resolveField(job.Name, resolved.Variables)
-			if err != nil {
-				return Config{}, fmt.Errorf("resolving job name %q: %w", job.Name, err)
-			}
-
-			job.Source, err = resolveField(job.Source, resolved.Variables)
-			if err != nil {
-				return Config{}, fmt.Errorf("resolving job source %q: %w", job.Source, err)
-			}
-
-			job.Target, err = resolveField(job.Target, resolved.Variables)
-			if err != nil {
-				return Config{}, fmt.Errorf("resolving job target %q: %w", job.Target, err)
-			}
+			return Config{}, fmt.Errorf("macro resolution incomplete: %w", err)
 		}
 	}
 
 	return resolved, nil
 }
 
-func ResolveConfig(cfg Config) (Config, error) {
-	resolvedCfg := cfg
+func resolveMapping(mapping *Mapping, variables map[string]string, joinPaths bool) error {
+	var err error
 
-	resolvedCfg.Variables = ResolveVariables(cfg.Variables)
+	mapping.Name, err = resolveField(mapping.Name, variables)
+	if err != nil {
+		return fmt.Errorf("resolving mapping name %q: %w", mapping.Name, err)
+	}
 
-	for mIdx := range resolvedCfg.Mappings {
-		mapping := &resolvedCfg.Mappings[mIdx]
+	mapping.Source, err = resolveField(mapping.Source, variables)
+	if err != nil {
+		return fmt.Errorf("resolving mapping source %q: %w", mapping.Source, err)
+	}
 
-		var err error
+	mapping.Target, err = resolveField(mapping.Target, variables)
+	if err != nil {
+		return fmt.Errorf("resolving mapping target %q: %w", mapping.Target, err)
+	}
 
-		mapping.Name, err = resolveField(mapping.Name, resolvedCfg.Variables)
+	for jIdx := range mapping.Jobs {
+		job := &mapping.Jobs[jIdx]
+
+		job.Name, err = resolveField(job.Name, variables)
 		if err != nil {
-			return Config{}, fmt.Errorf("resolving mapping name %q: %w", mapping.Name, err)
+			return fmt.Errorf("resolving job name %q: %w", job.Name, err)
 		}
 
-		mapping.Source, err = resolveField(mapping.Source, resolvedCfg.Variables)
+		job.Source, err = resolveField(job.Source, variables)
 		if err != nil {
-			return Config{}, fmt.Errorf("resolving mapping source %q: %w", mapping.Source, err)
+			return fmt.Errorf("resolving job source %q: %w", job.Source, err)
 		}
 
-		mapping.Target, err = resolveField(mapping.Target, resolvedCfg.Variables)
+		job.Target, err = resolveField(job.Target, variables)
 		if err != nil {
-			return Config{}, fmt.Errorf("resolving mapping target %q: %w", mapping.Target, err)
+			return fmt.Errorf("resolving job target %q: %w", job.Target, err)
 		}
 
-		for jIdx := range mapping.Jobs {
-			job := &mapping.Jobs[jIdx]
-
-			errs := make([]error, 0, 3) //nolint:mnd // 3 fields to resolve: Source, Target, Name
-
-			job.Name, err = resolveField(job.Name, resolvedCfg.Variables)
-			errs = append(errs, err)
-
-			job.Source, err = resolveField(job.Source, resolvedCfg.Variables)
-			errs = append(errs, err)
-
-			job.Target, err = resolveField(job.Target, resolvedCfg.Variables)
-			errs = append(errs, err)
-
-			joined := errors.Join(errs...)
-			if joined != nil {
-				return Config{}, fmt.Errorf("resolving job %q: %w", job.Name, joined)
-			}
-
-			// Join relative job paths with mapping base paths
+		if joinPaths {
 			job.Source = filepath.Join(mapping.Source, job.Source) + "/"
 			job.Target = filepath.Join(mapping.Target, job.Target)
 		}
 	}
 
-	err := ValidateNoUnresolvedMacros(resolvedCfg)
-	if err != nil {
-		return Config{}, fmt.Errorf("macro resolution incomplete: %w", err)
-	}
+	return nil
+}
 
-	return resolvedCfg, nil
+// ResolveConfig resolves all variables, macros, and joins job paths with mapping base paths.
+func ResolveConfig(cfg Config) (Config, error) {
+	return resolveFields(cfg, true)
 }
 
 func ValidateJobNames(jobs []Job) error {
@@ -401,7 +369,7 @@ func expandIncludes(cfg *Config, configDir string) error {
 			return fmt.Errorf("include %q: %w", inc.Uses, err)
 		}
 
-		resolved, err := resolveTemplateVariables(tmplCfg)
+		resolved, err := resolveFields(tmplCfg, false)
 		if err != nil {
 			return fmt.Errorf("include %q: resolving config: %w", inc.Uses, err)
 		}
