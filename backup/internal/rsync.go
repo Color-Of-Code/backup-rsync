@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -120,7 +121,7 @@ func ArgumentsForJob(job Job, logPath string, simulate bool) []string {
 		args = append(args, "--log-file="+logPath)
 	}
 
-	for _, excl := range job.Exclusions {
+	for excl := range slices.Values(job.Exclusions) {
 		args = append(args, "--exclude="+excl)
 	}
 

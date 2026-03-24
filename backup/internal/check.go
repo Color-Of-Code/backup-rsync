@@ -17,8 +17,8 @@ type CoverageChecker struct {
 }
 
 func (c *CoverageChecker) IsExcludedGlobally(path string, mappings []Mapping) bool {
-	for _, mapping := range mappings {
-		for _, exclusion := range mapping.Exclusions {
+	for mapping := range slices.Values(mappings) {
+		for exclusion := range slices.Values(mapping.Exclusions) {
 			exclusionPath := filepath.Join(mapping.Source, exclusion)
 			if strings.HasPrefix(NormalizePath(path), exclusionPath) {
 				c.Logger.Info(fmt.Sprintf("EXCLUDED: Path '%s' is globally excluded by '%s' in source '%s'",
@@ -37,7 +37,7 @@ func (c *CoverageChecker) ListUncoveredPaths(cfg Config) []string {
 
 	seen := make(map[string]bool)
 
-	for _, mapping := range cfg.Mappings {
+	for mapping := range slices.Values(cfg.Mappings) {
 		c.checkPath(mapping.Source, cfg.Mappings, &result, seen)
 	}
 
@@ -71,7 +71,7 @@ func (c *CoverageChecker) isCoveredByJob(path string, job Job) bool {
 }
 
 func (c *CoverageChecker) isCovered(path string, mappings []Mapping) bool {
-	for _, mapping := range mappings {
+	for mapping := range slices.Values(mappings) {
 		if slices.ContainsFunc(mapping.Jobs, func(job Job) bool {
 			return c.isCoveredByJob(path, job)
 		}) {
@@ -137,7 +137,7 @@ func (c *CoverageChecker) isEffectivelyCovered(path string, mappings []Mapping) 
 
 	allCovered := true
 
-	for _, child := range children {
+	for child := range slices.Values(children) {
 		covered := c.IsExcludedGlobally(child, mappings) || c.isCovered(child, mappings) ||
 			c.isEffectivelyCovered(child, mappings)
 		if !covered {
@@ -162,7 +162,7 @@ func getChildDirectories(fs afero.Fs, path string) ([]string, error) {
 		return nil, fmt.Errorf("failed to read directory '%s': %w", path, err)
 	}
 
-	for _, info := range fileInfos {
+	for info := range slices.Values(fileInfos) {
 		if info.IsDir() {
 			children = append(children, filepath.Join(path, info.Name()))
 		}

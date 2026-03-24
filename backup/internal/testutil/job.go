@@ -1,6 +1,9 @@
 package testutil
 
-import "backup-rsync/backup/internal"
+import (
+	"backup-rsync/backup/internal"
+	"slices"
+)
 
 // TestJobOpt configures a test Job struct.
 type TestJobOpt func(*internal.Job)
@@ -17,7 +20,7 @@ func NewTestJob(opts ...TestJobOpt) internal.Job {
 		Exclusions: []string{"*.tmp"},
 	}
 
-	for _, opt := range opts {
+	for opt := range slices.Values(opts) {
 		opt(&job)
 	}
 

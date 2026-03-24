@@ -3,6 +3,7 @@ package cmd
 import (
 	"backup-rsync/backup/internal"
 	"fmt"
+	"slices"
 
 	"github.com/spf13/cobra"
 )
@@ -38,7 +39,7 @@ func buildConfigCommand() *cobra.Command {
 		Short: "Manage configuration",
 	}
 
-	for _, verb := range configVerbs {
+	for verb := range slices.Values(configVerbs) {
 		configCmd.AddCommand(&cobra.Command{
 			Use:   verb.use,
 			Short: verb.short,

@@ -3,6 +3,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -210,7 +211,7 @@ func findInnermostMacro(input string) (int, int, string, string, bool) {
 func ValidateNoUnresolvedMacros(cfg Config) error {
 	var errs []error
 
-	for _, mapping := range cfg.Mappings {
+	for mapping := range slices.Values(cfg.Mappings) {
 		for _, field := range []struct {
 			name, value string
 		}{
@@ -224,7 +225,7 @@ func ValidateNoUnresolvedMacros(cfg Config) error {
 			}
 		}
 
-		for _, job := range mapping.Jobs {
+		for job := range slices.Values(mapping.Jobs) {
 			for _, field := range []struct {
 				name, value string
 			}{

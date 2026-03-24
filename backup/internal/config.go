@@ -55,7 +55,7 @@ type Config struct {
 // AllJobs returns a flat list of all jobs across all mappings.
 func (cfg Config) AllJobs() []Job {
 	var jobs []Job
-	for _, m := range cfg.Mappings {
+	for m := range slices.Values(cfg.Mappings) {
 		jobs = append(jobs, m.Jobs...)
 	}
 
@@ -83,7 +83,7 @@ func (cfg Config) Apply(rsync JobCommand, logger *slog.Logger) error {
 	counts := make(map[JobStatus]int)
 	allJobs := cfg.AllJobs()
 
-	for _, job := range allJobs {
+	for job := range slices.Values(allJobs) {
 		status := job.Apply(rsync)
 		rsync.ReportJobStatus(job.Name, status, logger)
 		counts[status]++
@@ -240,7 +240,7 @@ func ValidateJobNames(jobs []Job) error {
 
 	nameSet := make(map[string]bool)
 
-	for _, job := range jobs {
+	for job := range slices.Values(jobs) {
 		if nameSet[job.Name] {
 			invalidNames = append(invalidNames, "duplicate job name: "+job.Name)
 		} else {
@@ -288,7 +288,7 @@ func ValidateTemplateVars(cfg Config) error {
 
 	var missing []string
 
-	for _, v := range cfg.Template.Variables {
+	for v := range slices.Values(cfg.Template.Variables) {
 		if _, ok := cfg.Variables[v]; !ok {
 			missing = append(missing, v)
 		}
@@ -321,7 +321,7 @@ func loadTemplateConfig(templatePath string) (Config, error) {
 }
 
 func expandIncludes(cfg *Config, configDir string) error {
-	for _, inc := range cfg.Include {
+	for inc := range slices.Values(cfg.Include) {
 		templatePath := inc.Uses
 		if !filepath.IsAbs(templatePath) {
 			templatePath = filepath.Join(configDir, templatePath)
@@ -357,7 +357,7 @@ func expandIncludes(cfg *Config, configDir string) error {
 }
 
 func mergeOverrides(cfg Config, overrides []map[string]string) Config {
-	for _, override := range overrides {
+	for override := range slices.Values(overrides) {
 		if cfg.Variables == nil {
 			cfg.Variables = make(map[string]string)
 		}

@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -66,7 +67,7 @@ func (b *ConfigBuilder) AddJobToMapping(name, source, target string, opts ...Job
 	}
 
 	job := jobDef{name: name, source: source, target: target}
-	for _, opt := range opts {
+	for opt := range slices.Values(opts) {
 		opt(&job)
 	}
 

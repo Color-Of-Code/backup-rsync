@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -31,7 +32,7 @@ func parseSetFlags(cmd *cobra.Command) map[string]string {
 	setFlags, _ := cmd.Flags().GetStringArray("set")
 	overrides := make(map[string]string, len(setFlags))
 
-	for _, s := range setFlags {
+	for s := range slices.Values(setFlags) {
 		key, value, ok := strings.Cut(s, "=")
 		if ok {
 			overrides[key] = value
