@@ -11,6 +11,9 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  GO_VERSION: 1.26
+  GOLANGCI_LINT_VERSION: v2.11.4
+  NODE_VERSION: 24.x
 
 jobs:
 
@@ -22,12 +25,12 @@ jobs:
     - name: Setup NodeJS
       uses: actions/setup-node@v6
       with:
-        node-version: 24.x
+        node-version: ${{ env.NODE_VERSION }}
 
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25'
+        go-version: ${{ env.GO_VERSION }}
 
     - name: Sanity check
       run: make sanity-check
@@ -35,7 +38,7 @@ jobs:
     - name: Lint
       uses: golangci/golangci-lint-action@v9
       with:
-        version: 'v2.5.0'
+        version: ${{ env.GOLANGCI_LINT_VERSION }}
         args: --timeout=5m --verbose
 
     - name: Build
