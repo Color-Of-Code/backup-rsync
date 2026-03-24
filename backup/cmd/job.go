@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/spf13/afero"
@@ -25,6 +26,21 @@ type jobCommandOptions struct {
 	createLogger LoggerFactory
 }
 
+// parseSetFlags parses --set flag values (key=value) into a map.
+func parseSetFlags(cmd *cobra.Command) map[string]string {
+	setFlags, _ := cmd.Flags().GetStringArray("set")
+	overrides := make(map[string]string, len(setFlags))
+
+	for _, s := range setFlags {
+		key, value, ok := strings.Cut(s, "=")
+		if ok {
+			overrides[key] = value
+		}
+	}
+
+	return overrides
+}
+
 func buildJobCommand(fs afero.Fs, opts jobCommandOptions) *cobra.Command {
 	return &cobra.Command{
 		Use:   opts.use,
@@ -32,8 +48,9 @@ func buildJobCommand(fs afero.Fs, opts jobCommandOptions) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
 			rsyncPath, _ := cmd.Flags().GetString("rsync-path")
+			overrides := parseSetFlags(cmd)
 
-			cfg, err := internal.LoadResolvedConfig(configPath)
+			cfg, err := internal.LoadResolvedConfig(configPath, overrides)
 			if err != nil {
 				return fmt.Errorf("loading config: %w", err)
 			}

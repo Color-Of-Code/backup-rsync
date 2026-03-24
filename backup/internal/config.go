@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,15 +16,30 @@ import (
 
 // Static errors for wrapping..
 var (
-	ErrJobValidation   = errors.New("job validation failed")
-	ErrInvalidPath     = errors.New("invalid path")
-	ErrPathValidation  = errors.New("path validation failed")
-	ErrOverlappingPath = errors.New("overlapping path detected")
-	ErrJobFailure      = errors.New("one or more jobs failed")
+	ErrJobValidation       = errors.New("job validation failed")
+	ErrInvalidPath         = errors.New("invalid path")
+	ErrPathValidation      = errors.New("path validation failed")
+	ErrOverlappingPath     = errors.New("overlapping path detected")
+	ErrJobFailure          = errors.New("one or more jobs failed")
+	ErrMissingTemplateVars = errors.New("missing required template variables")
+	ErrNestedIncludes      = errors.New("nested includes are not supported")
 )
+
+// Template declares required variables for a template config file.
+type Template struct {
+	Variables []string `yaml:"variables"`
+}
+
+// Include references a template config to instantiate with specific variable values.
+type Include struct {
+	Uses string            `yaml:"uses"`
+	With map[string]string `yaml:"with"`
+}
 
 // Config represents the overall backup configuration.
 type Config struct {
+	Template  *Template         `yaml:"template,omitempty"`
+	Include   []Include         `yaml:"include,omitempty"`
 	Sources   []Path            `yaml:"sources"`
 	Targets   []Path            `yaml:"targets"`
 	Variables map[string]string `yaml:"variables"`
@@ -98,8 +114,56 @@ func resolveField(input string, variables map[string]string) (string, error) {
 	return resolved, nil
 }
 
+const maxResolvePasses = 10
+
+// ResolveVariables resolves variable-to-variable references within the variables map.
+// Variables can reference other variables (e.g., source_home: "/home/${user}").
+// Performs multiple passes until no further substitutions occur or maxResolvePasses is reached.
+func ResolveVariables(variables map[string]string) map[string]string {
+	resolved := make(map[string]string, len(variables))
+	maps.Copy(resolved, variables)
+
+	for range maxResolvePasses {
+		changed := false
+
+		for k, v := range resolved {
+			newV := SubstituteVariables(v, resolved)
+			if newV != v {
+				resolved[k] = newV
+				changed = true
+			}
+		}
+
+		if !changed {
+			break
+		}
+	}
+
+	return resolved
+}
+
 func ResolveConfig(cfg Config) (Config, error) {
 	resolvedCfg := cfg
+
+	resolvedCfg.Variables = ResolveVariables(cfg.Variables)
+
+	for idx, source := range resolvedCfg.Sources {
+		resolved, err := resolveField(source.Path, resolvedCfg.Variables)
+		if err != nil {
+			return Config{}, fmt.Errorf("resolving source path %q: %w", source.Path, err)
+		}
+
+		resolvedCfg.Sources[idx].Path = resolved
+	}
+
+	for idx, target := range resolvedCfg.Targets {
+		resolved, err := resolveField(target.Path, resolvedCfg.Variables)
+		if err != nil {
+			return Config{}, fmt.Errorf("resolving target path %q: %w", target.Path, err)
+		}
+
+		resolvedCfg.Targets[idx].Path = resolved
+	}
 
 	for idx := range resolvedCfg.Jobs {
 		job := &resolvedCfg.Jobs[idx]
@@ -108,13 +172,13 @@ func ResolveConfig(cfg Config) (Config, error) {
 
 		var err error
 
-		job.Source, err = resolveField(job.Source, cfg.Variables)
+		job.Source, err = resolveField(job.Source, resolvedCfg.Variables)
 		errs = append(errs, err)
 
-		job.Target, err = resolveField(job.Target, cfg.Variables)
+		job.Target, err = resolveField(job.Target, resolvedCfg.Variables)
 		errs = append(errs, err)
 
-		job.Name, err = resolveField(job.Name, cfg.Variables)
+		job.Name, err = resolveField(job.Name, resolvedCfg.Variables)
 		errs = append(errs, err)
 
 		joined := errors.Join(errs...)
@@ -200,7 +264,97 @@ func validateJobPaths(jobs []Job, pathType string, getPath func(job Job) string)
 	return nil
 }
 
-func LoadResolvedConfig(configPath string) (Config, error) {
+// ValidateTemplateVars checks that all variables declared in the template section have values.
+func ValidateTemplateVars(cfg Config) error {
+	if cfg.Template == nil || len(cfg.Template.Variables) == 0 {
+		return nil
+	}
+
+	var missing []string
+
+	for _, v := range cfg.Template.Variables {
+		if _, ok := cfg.Variables[v]; !ok {
+			missing = append(missing, v)
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("%w: %v", ErrMissingTemplateVars, missing)
+	}
+
+	return nil
+}
+
+func loadTemplateConfig(templatePath string) (Config, error) {
+	templateFile, err := os.Open(templatePath)
+	if err != nil {
+		return Config{}, fmt.Errorf("failed to open: %w", err)
+	}
+	defer templateFile.Close()
+
+	cfg, err := LoadConfig(templateFile)
+	if err != nil {
+		return Config{}, fmt.Errorf("failed to parse: %w", err)
+	}
+
+	if len(cfg.Include) > 0 {
+		return Config{}, ErrNestedIncludes
+	}
+
+	return cfg, nil
+}
+
+func expandIncludes(cfg *Config, configDir string) error {
+	for _, inc := range cfg.Include {
+		templatePath := inc.Uses
+		if !filepath.IsAbs(templatePath) {
+			templatePath = filepath.Join(configDir, templatePath)
+		}
+
+		tmplCfg, err := loadTemplateConfig(templatePath)
+		if err != nil {
+			return fmt.Errorf("include %q: %w", inc.Uses, err)
+		}
+
+		if tmplCfg.Variables == nil {
+			tmplCfg.Variables = make(map[string]string)
+		}
+
+		maps.Copy(tmplCfg.Variables, inc.With)
+
+		err = ValidateTemplateVars(tmplCfg)
+		if err != nil {
+			return fmt.Errorf("include %q: %w", inc.Uses, err)
+		}
+
+		resolved, err := ResolveConfig(tmplCfg)
+		if err != nil {
+			return fmt.Errorf("include %q: resolving config: %w", inc.Uses, err)
+		}
+
+		cfg.Sources = append(cfg.Sources, resolved.Sources...)
+		cfg.Targets = append(cfg.Targets, resolved.Targets...)
+		cfg.Jobs = append(cfg.Jobs, resolved.Jobs...)
+	}
+
+	cfg.Include = nil
+
+	return nil
+}
+
+func mergeOverrides(cfg Config, overrides []map[string]string) Config {
+	for _, override := range overrides {
+		if cfg.Variables == nil {
+			cfg.Variables = make(map[string]string)
+		}
+
+		maps.Copy(cfg.Variables, override)
+	}
+
+	return cfg
+}
+
+func LoadResolvedConfig(configPath string, overrides ...map[string]string) (Config, error) {
 	configFile, err := os.Open(configPath)
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to open config: %w", err)
@@ -212,14 +366,30 @@ func LoadResolvedConfig(configPath string) (Config, error) {
 		return Config{}, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
-	err = ValidateJobNames(cfg.Jobs)
+	cfg = mergeOverrides(cfg, overrides)
+
+	return resolveAndValidate(cfg, filepath.Dir(configPath))
+}
+
+func resolveAndValidate(cfg Config, configDir string) (Config, error) {
+	err := expandIncludes(&cfg, configDir)
 	if err != nil {
-		return Config{}, fmt.Errorf("job validation failed: %w", err)
+		return Config{}, fmt.Errorf("expanding includes: %w", err)
+	}
+
+	err = ValidateTemplateVars(cfg)
+	if err != nil {
+		return Config{}, fmt.Errorf("template validation failed: %w", err)
 	}
 
 	resolvedCfg, err := ResolveConfig(cfg)
 	if err != nil {
 		return Config{}, fmt.Errorf("config resolution failed: %w", err)
+	}
+
+	err = ValidateJobNames(resolvedCfg.Jobs)
+	if err != nil {
+		return Config{}, fmt.Errorf("job validation failed: %w", err)
 	}
 
 	err = ValidatePaths(resolvedCfg)

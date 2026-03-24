@@ -5,10 +5,12 @@ The backup tool is configured using a YAML file, typically named `sync.yaml`. Th
 ## Top-Level Structure
 
 ```yaml
-sources: # List of source paths to back up
-targets: # List of target paths for backups
-variables: # Key-value pairs for variable substitution
-jobs: # List of backup jobs
+template:   # (Optional) Declares required variables for this template
+include:    # (Optional) List of template configs to instantiate
+sources:    # List of source paths to back up
+targets:    # List of target paths for backups
+variables:  # Key-value pairs for variable substitution
+jobs:       # List of backup jobs
 ```
 
 ## Sources and Targets
@@ -44,6 +46,33 @@ variables:
 jobs:
   - name: "${user}_docs"
     target: "/backup/@{capitalize:${user}}/docs"  # resolves to /backup/Alice/docs
+```
+
+## Template (Optional)
+
+Declares which variables a config file requires. When present, the tool validates
+that every listed variable has a value before resolving. See
+[templating.md](templating.md) for details.
+
+```yaml
+template:
+  variables:
+    - user
+    - user_cap
+```
+
+## Include (Optional)
+
+Instantiate one or more template configs with specific variable bindings. Each
+entry references a template file and provides the required variables. See
+[templating.md](templating.md) for details.
+
+```yaml
+include:
+  - uses: user_template.yaml
+    with:
+      user: alice
+      user_cap: Alice
 ```
 
 ## Jobs
@@ -101,3 +130,4 @@ jobs:
 - Exclusions are relative to the specified source or target path.
 - Jobs with `enabled: false` are ignored.
 - If `delete` is omitted, it defaults to `true` (target files not present in source will be deleted from the destination).
+- For templating features (`template:`, `include:`, `--set` flags), see [templating.md](templating.md).

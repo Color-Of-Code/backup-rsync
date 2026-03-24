@@ -23,3 +23,17 @@ func WriteConfigFile(t *testing.T, content string) string {
 
 	return path
 }
+
+// WriteConfigFileInDir writes YAML content to a named file in the given directory.
+func WriteConfigFileInDir(t *testing.T, dir, name, content string) string {
+	t.Helper()
+
+	path := filepath.Join(dir, name)
+
+	err := os.WriteFile(path, []byte(content), internal.LogFilePermission)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	return path
+}

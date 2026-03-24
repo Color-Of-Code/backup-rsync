@@ -359,3 +359,181 @@ func TestRun_LoggerOpenDuringApply(t *testing.T) {
 	assert.Contains(t, summaryContent, "STATUS [docs]: SUCCESS",
 		"logger must remain open during cfg.Apply — proves defer cleanup() is function-scoped")
 }
+
+// --- --set flag ---
+
+func TestConfigShow_WithSetFlag(t *testing.T) {
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home/${user}").Target("/backup/${user}").
+		Variable("user", "default").
+		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		Build())
+
+	stdout, err := executeCommand(t, "config", "show", "--config", cfgPath, "--set", "user=alice")
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "alice_docs")
+	assert.Contains(t, stdout, "/home/alice/docs/")
+	assert.Contains(t, stdout, "/backup/alice/docs/")
+	assert.NotContains(t, stdout, "${user}")
+}
+
+func TestConfigValidate_WithSetFlag(t *testing.T) {
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home/${user}").Target("/backup/${user}").
+		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		Build())
+
+	stdout, err := executeCommand(t, "config", "validate", "--config", cfgPath, "--set", "user=bob")
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Configuration is valid.")
+}
+
+func TestList_WithSetFlag(t *testing.T) {
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		Source("/home/${user}").Target("/backup/${user}").
+		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		Build())
+
+	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
+
+	fs := afero.NewMemMapFs()
+	stdout, err := executeCommandWithDeps(t, fs, shell, "list", "--config", cfgPath, "--set", "user=alice")
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Job: alice_docs")
+}
+
+// --- template: variables validation at command level ---
+
+func TestConfigValidate_TemplateVarsMissing(t *testing.T) {
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		TemplateVar("user").TemplateVar("user_cap").
+		Source("/home/${user}").Target("/backup/${user}").
+		AddJob("docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		Build())
+
+	_, err := executeCommand(t, "config", "validate", "--config", cfgPath)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing required template variables")
+}
+
+func TestConfigValidate_TemplateVarsProvidedViaSet(t *testing.T) {
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		TemplateVar("user").
+		Source("/home/${user}").Target("/backup/${user}").
+		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		Build())
+
+	stdout, err := executeCommand(t, "config", "validate", "--config", cfgPath, "--set", "user=alice")
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Configuration is valid.")
+}
+
+func TestConfigShow_TemplateVarsResolved(t *testing.T) {
+	cfgPath := testutil.WriteConfigFile(t, testutil.NewConfigBuilder().
+		TemplateVar("user").
+		Source("/home/${user}").Target("/backup/${user}").
+		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		Build())
+
+	stdout, err := executeCommand(t, "config", "show", "--config", cfgPath, "--set", "user=alice")
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "alice_docs")
+	assert.NotContains(t, stdout, "${user}")
+}
+
+// --- include at command level ---
+
+func TestConfigShow_WithInclude(t *testing.T) {
+	dir := t.TempDir()
+
+	template := testutil.NewConfigBuilder().
+		TemplateVar("user").
+		Source("/home/${user}").Target("/backup/${user}").
+		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		Build()
+	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
+
+	main := testutil.NewConfigBuilder().
+		AddInclude("template.yaml", map[string]string{"user": "alice"}).
+		Build()
+	mainPath := testutil.WriteConfigFileInDir(t, dir, "main.yaml", main)
+
+	stdout, err := executeCommand(t, "config", "show", "--config", mainPath)
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "alice_docs")
+	assert.Contains(t, stdout, "/home/alice/docs/")
+}
+
+func TestConfigValidate_WithInclude(t *testing.T) {
+	dir := t.TempDir()
+
+	template := testutil.NewConfigBuilder().
+		TemplateVar("user").
+		Source("/home/${user}").Target("/backup/${user}").
+		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		Build()
+	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
+
+	main := testutil.NewConfigBuilder().
+		AddInclude("template.yaml", map[string]string{"user": "bob"}).
+		Build()
+	mainPath := testutil.WriteConfigFileInDir(t, dir, "main.yaml", main)
+
+	stdout, err := executeCommand(t, "config", "validate", "--config", mainPath)
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Configuration is valid.")
+}
+
+func TestConfigValidate_IncludeMissingVars(t *testing.T) {
+	dir := t.TempDir()
+
+	template := testutil.NewConfigBuilder().
+		TemplateVar("user").TemplateVar("user_cap").
+		Source("/home/${user}").Target("/backup/${user}").
+		AddJob("docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		Build()
+	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
+
+	main := testutil.NewConfigBuilder().
+		AddInclude("template.yaml", map[string]string{"user": "alice"}).
+		Build()
+	mainPath := testutil.WriteConfigFileInDir(t, dir, "main.yaml", main)
+
+	_, err := executeCommand(t, "config", "validate", "--config", mainPath)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing required template variables")
+}
+
+func TestList_WithInclude(t *testing.T) {
+	dir := t.TempDir()
+
+	template := testutil.NewConfigBuilder().
+		TemplateVar("user").
+		Source("/home/${user}").Target("/backup/${user}").
+		AddJob("${user}_docs", "/home/${user}/docs/", "/backup/${user}/docs/").
+		Build()
+	testutil.WriteConfigFileInDir(t, dir, "template.yaml", template)
+
+	main := testutil.NewConfigBuilder().
+		AddInclude("template.yaml", map[string]string{"user": "alice"}).
+		AddInclude("template.yaml", map[string]string{"user": "bob"}).
+		Build()
+	mainPath := testutil.WriteConfigFileInDir(t, dir, "main.yaml", main)
+
+	shell := &stubExec{output: []byte("rsync version 3.2.7 protocol version 31\n")}
+
+	stdout, err := executeCommandWithDeps(t, afero.NewMemMapFs(), shell, "list", "--config", mainPath)
+
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Job: alice_docs")
+	assert.Contains(t, stdout, "Job: bob_docs")
+}

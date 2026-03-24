@@ -52,8 +52,9 @@ func buildConfigCommand() *cobra.Command {
 func configRunE(verb configVerb) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		configPath, _ := cmd.Flags().GetString("config")
+		overrides := parseSetFlags(cmd)
 
-		cfg, err := internal.LoadResolvedConfig(configPath)
+		cfg, err := internal.LoadResolvedConfig(configPath, overrides)
 		if err != nil {
 			return fmt.Errorf("%s: %w", verb.errCtx, err)
 		}

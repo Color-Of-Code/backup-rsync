@@ -17,12 +17,19 @@ type jobDef struct {
 	exclusions []string
 }
 
+type includeDef struct {
+	uses string
+	with map[string]string
+}
+
 // ConfigBuilder constructs YAML config strings declaratively.
 type ConfigBuilder struct {
-	sources   []string
-	targets   []string
-	variables map[string]string
-	jobs      []jobDef
+	sources      []string
+	targets      []string
+	variables    map[string]string
+	jobs         []jobDef
+	templateVars []string
+	includes     []includeDef
 }
 
 // NewConfigBuilder creates an empty ConfigBuilder.
@@ -65,9 +72,26 @@ func (b *ConfigBuilder) AddJob(name, source, target string, opts ...JobOpt) *Con
 	return b
 }
 
+// TemplateVar adds a required template variable name.
+func (b *ConfigBuilder) TemplateVar(name string) *ConfigBuilder {
+	b.templateVars = append(b.templateVars, name)
+
+	return b
+}
+
+// AddInclude adds a template include with variable bindings.
+func (b *ConfigBuilder) AddInclude(uses string, with map[string]string) *ConfigBuilder {
+	b.includes = append(b.includes, includeDef{uses: uses, with: with})
+
+	return b
+}
+
 // Build produces the YAML config string.
 func (b *ConfigBuilder) Build() string {
 	var result strings.Builder
+
+	b.writeTemplate(&result)
+	b.writeIncludes(&result)
 
 	result.WriteString("sources:\n")
 
@@ -92,28 +116,64 @@ func (b *ConfigBuilder) Build() string {
 	result.WriteString("jobs:\n")
 
 	for _, job := range b.jobs {
-		fmt.Fprintf(&result, "  - name: %q\n", job.name)
-		fmt.Fprintf(&result, "    source: %q\n", job.source)
-		fmt.Fprintf(&result, "    target: %q\n", job.target)
-
-		if job.delete != nil {
-			fmt.Fprintf(&result, "    delete: %v\n", *job.delete)
-		}
-
-		if job.enabled != nil {
-			fmt.Fprintf(&result, "    enabled: %v\n", *job.enabled)
-		}
-
-		if len(job.exclusions) > 0 {
-			result.WriteString("    exclusions:\n")
-
-			for _, e := range job.exclusions {
-				fmt.Fprintf(&result, "      - %q\n", e)
-			}
-		}
+		writeJob(&result, job)
 	}
 
 	return result.String()
+}
+
+func (b *ConfigBuilder) writeTemplate(writer *strings.Builder) {
+	if len(b.templateVars) == 0 {
+		return
+	}
+
+	writer.WriteString("template:\n  variables:\n")
+
+	for _, v := range b.templateVars {
+		fmt.Fprintf(writer, "    - %q\n", v)
+	}
+}
+
+func (b *ConfigBuilder) writeIncludes(writer *strings.Builder) {
+	if len(b.includes) == 0 {
+		return
+	}
+
+	writer.WriteString("include:\n")
+
+	for _, inc := range b.includes {
+		fmt.Fprintf(writer, "  - uses: %q\n", inc.uses)
+
+		if len(inc.with) > 0 {
+			writer.WriteString("    with:\n")
+
+			for k, v := range inc.with {
+				fmt.Fprintf(writer, "      %s: %q\n", k, v)
+			}
+		}
+	}
+}
+
+func writeJob(writer *strings.Builder, job jobDef) {
+	fmt.Fprintf(writer, "  - name: %q\n", job.name)
+	fmt.Fprintf(writer, "    source: %q\n", job.source)
+	fmt.Fprintf(writer, "    target: %q\n", job.target)
+
+	if job.delete != nil {
+		fmt.Fprintf(writer, "    delete: %v\n", *job.delete)
+	}
+
+	if job.enabled != nil {
+		fmt.Fprintf(writer, "    enabled: %v\n", *job.enabled)
+	}
+
+	if len(job.exclusions) > 0 {
+		writer.WriteString("    exclusions:\n")
+
+		for _, e := range job.exclusions {
+			fmt.Fprintf(writer, "      - %q\n", e)
+		}
+	}
 }
 
 // Enabled sets the enabled flag on a job.

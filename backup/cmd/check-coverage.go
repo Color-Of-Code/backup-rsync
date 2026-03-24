@@ -16,8 +16,9 @@ func buildCheckCoverageCommand(fs afero.Fs) *cobra.Command {
 		Short: "Check path coverage",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configPath, _ := cmd.Flags().GetString("config")
+			overrides := parseSetFlags(cmd)
 
-			cfg, err := internal.LoadResolvedConfig(configPath)
+			cfg, err := internal.LoadResolvedConfig(configPath, overrides)
 			if err != nil {
 				return fmt.Errorf("loading config: %w", err)
 			}

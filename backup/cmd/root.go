@@ -27,6 +27,7 @@ func BuildRootCommandWithDeps(fs afero.Fs, shell internal.Exec) *cobra.Command {
 
 	rootCmd.PersistentFlags().String("config", "config.yaml", "Path to the configuration file")
 	rootCmd.PersistentFlags().String("rsync-path", "/usr/bin/rsync", "Path to the rsync binary")
+	rootCmd.PersistentFlags().StringArray("set", nil, "Set a variable override (key=value), can be repeated")
 
 	rootCmd.AddCommand(
 		buildListCommand(shell),
