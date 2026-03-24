@@ -35,12 +35,6 @@ func NewUTCLogger(w io.Writer) *log.Logger {
 	return log.New(&UTCLogWriter{W: w, Now: time.Now}, "", 0)
 }
 
-// Path represents a source or target path with optional exclusions.
-type Path struct {
-	Path       string   `yaml:"path"`
-	Exclusions []string `yaml:"exclusions"`
-}
-
 func NormalizePath(path string) string {
 	return strings.TrimSuffix(strings.ReplaceAll(path, "//", "/"), "/")
 }

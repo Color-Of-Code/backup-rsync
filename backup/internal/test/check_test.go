@@ -29,9 +29,9 @@ func newSilentChecker(fs afero.Fs) *CoverageChecker {
 }
 
 func TestIsExcludedGlobally(t *testing.T) {
-	sources := []Path{
-		{Path: "/home/data/", Exclusions: []string{"/projects/P1/", "/media/"}},
-		{Path: "/home/user/", Exclusions: []string{"/cache/", "/npm/"}},
+	mappings := []Mapping{
+		{Name: "data", Source: "/home/data/", Exclusions: []string{"/projects/P1/", "/media/"}},
+		{Name: "user", Source: "/home/user/", Exclusions: []string{"/cache/", "/npm/"}},
 	}
 
 	tests := []struct {
@@ -51,7 +51,7 @@ func TestIsExcludedGlobally(t *testing.T) {
 
 			checker := newTestChecker(nil, &logBuf)
 
-			result := checker.IsExcludedGlobally(test.path, sources)
+			result := checker.IsExcludedGlobally(test.path, mappings)
 
 			assert.Equal(t, test.want, result)
 

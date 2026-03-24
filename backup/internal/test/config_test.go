@@ -1018,7 +1018,7 @@ func TestResolveConfig_JobNameMacroError(t *testing.T) {
 	assert.Contains(t, err.Error(), "resolving job")
 }
 
-// --- AllJobs, AllSources, AllTargets helpers ---
+// --- AllJobs helper ---
 
 func TestAllJobs(t *testing.T) {
 	cfg := Config{
@@ -1033,34 +1033,4 @@ func TestAllJobs(t *testing.T) {
 	assert.Equal(t, "j1", allJobs[0].Name)
 	assert.Equal(t, "j2", allJobs[1].Name)
 	assert.Equal(t, "j3", allJobs[2].Name)
-}
-
-func TestAllSources(t *testing.T) {
-	cfg := Config{
-		Mappings: []Mapping{
-			{Name: "m1", Source: "/s1", Target: "/t1", Exclusions: []string{"cache"}},
-			{Name: "m2", Source: "/s2", Target: "/t2"},
-		},
-	}
-
-	sources := cfg.AllSources()
-	require.Len(t, sources, 2)
-	assert.Equal(t, "/s1", sources[0].Path)
-	assert.Equal(t, []string{"cache"}, sources[0].Exclusions)
-	assert.Equal(t, "/s2", sources[1].Path)
-}
-
-func TestAllTargets(t *testing.T) {
-	cfg := Config{
-		Mappings: []Mapping{
-			{Name: "m1", Source: "/s1", Target: "/t1"},
-			{Name: "m2", Source: "/s2", Target: "/t1"}, // duplicate target
-			{Name: "m3", Source: "/s3", Target: "/t2"},
-		},
-	}
-
-	targets := cfg.AllTargets()
-	require.Len(t, targets, 2)
-	assert.Equal(t, "/t1", targets[0].Path)
-	assert.Equal(t, "/t2", targets[1].Path)
 }

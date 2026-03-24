@@ -62,32 +62,6 @@ func (cfg Config) AllJobs() []Job {
 	return jobs
 }
 
-// AllSources derives a []Path from all mapping sources and their exclusions.
-func (cfg Config) AllSources() []Path {
-	sources := make([]Path, 0, len(cfg.Mappings))
-	for _, m := range cfg.Mappings {
-		sources = append(sources, Path{Path: m.Source, Exclusions: m.Exclusions})
-	}
-
-	return sources
-}
-
-// AllTargets derives a deduplicated []Path from all mapping targets.
-func (cfg Config) AllTargets() []Path {
-	seen := make(map[string]bool)
-
-	var targets []Path
-
-	for _, m := range cfg.Mappings {
-		if !seen[m.Target] {
-			seen[m.Target] = true
-			targets = append(targets, Path{Path: m.Target})
-		}
-	}
-
-	return targets
-}
-
 func (cfg Config) String() string {
 	out, err := yaml.Marshal(cfg)
 	if err != nil {
