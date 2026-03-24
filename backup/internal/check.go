@@ -36,10 +36,9 @@ func (c *CoverageChecker) ListUncoveredPaths(cfg Config) []string {
 	var result []string
 
 	seen := make(map[string]bool)
-	allJobs := cfg.AllJobs()
 
 	for _, mapping := range cfg.Mappings {
-		c.checkPath(mapping.Source, cfg.Mappings, allJobs, &result, seen)
+		c.checkPath(mapping.Source, cfg.Mappings, &result, seen)
 	}
 
 	slices.Sort(result) // Ensure consistent ordering for test comparison
@@ -71,14 +70,20 @@ func (c *CoverageChecker) isCoveredByJob(path string, job Job) bool {
 	return false
 }
 
-func (c *CoverageChecker) isCovered(path string, jobs []Job) bool {
-	return slices.ContainsFunc(jobs, func(job Job) bool {
-		return c.isCoveredByJob(path, job)
-	})
+func (c *CoverageChecker) isCovered(path string, mappings []Mapping) bool {
+	for _, mapping := range mappings {
+		if slices.ContainsFunc(mapping.Jobs, func(job Job) bool {
+			return c.isCoveredByJob(path, job)
+		}) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (c *CoverageChecker) checkPath(
-	path string, mappings []Mapping, jobs []Job, result *[]string, seen map[string]bool,
+	path string, mappings []Mapping, result *[]string, seen map[string]bool,
 ) {
 	if seen[path] {
 		c.Logger.Printf("SKIP: Path '%s' already seen", path)
@@ -96,14 +101,14 @@ func (c *CoverageChecker) checkPath(
 	}
 
 	// Skip if covered by a job
-	if c.isCovered(path, jobs) {
+	if c.isCovered(path, mappings) {
 		c.Logger.Printf("SKIP: Path '%s' is covered by a job", path)
 
 		return
 	}
 
 	// Check if it's effectively covered through descendants
-	if c.isEffectivelyCovered(path, mappings, jobs) {
+	if c.isEffectivelyCovered(path, mappings) {
 		c.Logger.Printf("SKIP: Path '%s' is effectively covered", path)
 
 		return
@@ -116,7 +121,7 @@ func (c *CoverageChecker) checkPath(
 
 // isEffectivelyCovered checks if a directory is effectively covered
 // (all its descendants are covered or excluded).
-func (c *CoverageChecker) isEffectivelyCovered(path string, mappings []Mapping, jobs []Job) bool {
+func (c *CoverageChecker) isEffectivelyCovered(path string, mappings []Mapping) bool {
 	children, err := getChildDirectories(c.Fs, path)
 	if err != nil {
 		c.Logger.Printf("ERROR: could not get child directories of '%s': %v", path, err)
@@ -133,8 +138,8 @@ func (c *CoverageChecker) isEffectivelyCovered(path string, mappings []Mapping, 
 	allCovered := true
 
 	for _, child := range children {
-		covered := c.IsExcludedGlobally(child, mappings) || c.isCovered(child, jobs) ||
-			c.isEffectivelyCovered(child, mappings, jobs)
+		covered := c.IsExcludedGlobally(child, mappings) || c.isCovered(child, mappings) ||
+			c.isEffectivelyCovered(child, mappings)
 		if !covered {
 			c.Logger.Printf("UNCOVERED CHILD: Path '%s' has uncovered child '%s'", path, child)
 
