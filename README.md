@@ -161,6 +161,4 @@ Each job writes its rsync output to a dedicated log file, typically named `job-<
 
 The log files contain the full rsync output, including the itemized changes and statistics. A `summary.log` file records the status (SUCCESS, FAILURE, SKIPPED) for each job in the run.
 
-**Empty log files** may indicate that no changes were made during the backup for that job.
-
 You can review these logs to audit what was copied, changed, or deleted during each backup run.
