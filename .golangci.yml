@@ -40,6 +40,7 @@ linters:
       check-blank: true
     gosec:
       excludes:
+        - G204 # ignore Subprocess launched with variable (OsExec abstraction)
         - G304 # ignore Potential file inclusion via variable 
     varnamelen:
       ignore-decls:
